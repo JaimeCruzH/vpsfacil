@@ -1,33 +1,77 @@
 #!/bin/bash
-################################################################################
-# VPSfacil - Color Definitions for Terminal Output
-# ANSI color codes for formatted terminal output
-################################################################################
+# ============================================================
+# lib/colors.sh — Colores ANSI y funciones de output
+# VPSfacil - Sistema Automatizado de Instalación en VPS
+# ============================================================
 
-# Text Colors
-readonly RED='\033[0;31m'
-readonly GREEN='\033[0;32m'
-readonly YELLOW='\033[1;33m'
-readonly BLUE='\033[0;34m'
-readonly CYAN='\033[0;36m'
-readonly MAGENTA='\033[0;35m'
-readonly WHITE='\033[0;37m'
+# --- Colores base ---
+readonly COLOR_RESET="\033[0m"
+readonly COLOR_BOLD="\033[1m"
 
-# Text Formatting
-readonly BOLD='\033[1m'
-readonly NORMAL='\033[0m'
-readonly UNDERLINE='\033[4m'
-readonly DIM='\033[2m'
+readonly COLOR_RED="\033[0;31m"
+readonly COLOR_GREEN="\033[0;32m"
+readonly COLOR_YELLOW="\033[0;33m"
+readonly COLOR_BLUE="\033[0;34m"
+readonly COLOR_MAGENTA="\033[0;35m"
+readonly COLOR_CYAN="\033[0;36m"
+readonly COLOR_WHITE="\033[0;37m"
 
-# Background Colors
-readonly BG_RED='\033[41m'
-readonly BG_GREEN='\033[42m'
-readonly BG_YELLOW='\033[43m'
-readonly BG_BLUE='\033[44m'
+readonly COLOR_BOLD_RED="\033[1;31m"
+readonly COLOR_BOLD_GREEN="\033[1;32m"
+readonly COLOR_BOLD_YELLOW="\033[1;33m"
+readonly COLOR_BOLD_BLUE="\033[1;34m"
+readonly COLOR_BOLD_MAGENTA="\033[1;35m"
+readonly COLOR_BOLD_CYAN="\033[1;36m"
+readonly COLOR_BOLD_WHITE="\033[1;37m"
 
-# No Color (reset)
-readonly NC='\033[0m'
+# --- Prefijos de mensajes ---
+readonly PREFIX_INFO="${COLOR_BOLD_BLUE}[ℹ]${COLOR_RESET}"
+readonly PREFIX_SUCCESS="${COLOR_BOLD_GREEN}[✓]${COLOR_RESET}"
+readonly PREFIX_WARNING="${COLOR_BOLD_YELLOW}[⚠]${COLOR_RESET}"
+readonly PREFIX_ERROR="${COLOR_BOLD_RED}[✗]${COLOR_RESET}"
+readonly PREFIX_PROMPT="${COLOR_BOLD_CYAN}[?]${COLOR_RESET}"
+readonly PREFIX_PROCESS="${COLOR_BOLD_MAGENTA}[⏳]${COLOR_RESET}"
+readonly PREFIX_STEP="${COLOR_BOLD_WHITE}[→]${COLOR_RESET}"
 
-################################################################################
-# END OF COLOR DEFINITIONS
-################################################################################
+# --- Función: Separador simple ---
+print_separator() {
+    echo -e "${COLOR_BLUE}────────────────────────────────────────────────────────────${COLOR_RESET}"
+}
+
+# --- Función: Cabecera de sección ---
+# Uso: print_header "Título de la sección"
+print_header() {
+    local title="$1"
+    local width=60
+    local title_len=${#title}
+    local padding=$(( (width - title_len) / 2 ))
+    local left_pad
+    left_pad=$(printf '%*s' "$padding" '')
+    local right_pad
+    right_pad=$(printf '%*s' "$((width - title_len - padding))" '')
+
+    echo ""
+    echo -e "${COLOR_BOLD_BLUE}╔$(printf '═%.0s' $(seq 1 $width))╗${COLOR_RESET}"
+    echo -e "${COLOR_BOLD_BLUE}║${COLOR_RESET}${COLOR_BOLD_WHITE}${left_pad}${title}${right_pad}${COLOR_RESET}${COLOR_BOLD_BLUE}║${COLOR_RESET}"
+    echo -e "${COLOR_BOLD_BLUE}╚$(printf '═%.0s' $(seq 1 $width))╝${COLOR_RESET}"
+    echo ""
+}
+
+# --- Función: Banner principal del proyecto ---
+print_banner() {
+    echo ""
+    echo -e "${COLOR_BOLD_BLUE}╔══════════════════════════════════════════════════════════════╗${COLOR_RESET}"
+    echo -e "${COLOR_BOLD_BLUE}║${COLOR_RESET}                                                              ${COLOR_BOLD_BLUE}║${COLOR_RESET}"
+    echo -e "${COLOR_BOLD_BLUE}║${COLOR_RESET}  ${COLOR_BOLD_GREEN}██╗   ██╗██████╗ ███████╗███████╗ █████╗  ██████╗ ██╗     ${COLOR_RESET}  ${COLOR_BOLD_BLUE}║${COLOR_RESET}"
+    echo -e "${COLOR_BOLD_BLUE}║${COLOR_RESET}  ${COLOR_BOLD_GREEN}██║   ██║██╔══██╗██╔════╝██╔════╝██╔══██╗██╔════╝ ██║     ${COLOR_RESET}  ${COLOR_BOLD_BLUE}║${COLOR_RESET}"
+    echo -e "${COLOR_BOLD_BLUE}║${COLOR_RESET}  ${COLOR_BOLD_GREEN}██║   ██║██████╔╝███████╗█████╗  ███████║██║      ██║     ${COLOR_RESET}  ${COLOR_BOLD_BLUE}║${COLOR_RESET}"
+    echo -e "${COLOR_BOLD_BLUE}║${COLOR_RESET}  ${COLOR_BOLD_GREEN}╚██╗ ██╔╝██╔═══╝ ╚════██║██╔══╝  ██╔══██║██║      ██║     ${COLOR_RESET}  ${COLOR_BOLD_BLUE}║${COLOR_RESET}"
+    echo -e "${COLOR_BOLD_BLUE}║${COLOR_RESET}  ${COLOR_BOLD_GREEN} ╚████╔╝ ██║     ███████║██║     ██║  ██║╚██████╗ ███████╗${COLOR_RESET}  ${COLOR_BOLD_BLUE}║${COLOR_RESET}"
+    echo -e "${COLOR_BOLD_BLUE}║${COLOR_RESET}  ${COLOR_BOLD_GREEN}  ╚═══╝  ╚═╝     ╚══════╝╚═╝     ╚═╝  ╚═╝ ╚═════╝ ╚══════╝${COLOR_RESET}  ${COLOR_BOLD_BLUE}║${COLOR_RESET}"
+    echo -e "${COLOR_BOLD_BLUE}║${COLOR_RESET}                                                              ${COLOR_BOLD_BLUE}║${COLOR_RESET}"
+    echo -e "${COLOR_BOLD_BLUE}║${COLOR_RESET}  ${COLOR_BOLD_CYAN}        Instalación Automatizada de VPS v1.0            ${COLOR_RESET}  ${COLOR_BOLD_BLUE}║${COLOR_RESET}"
+    echo -e "${COLOR_BOLD_BLUE}║${COLOR_RESET}  ${COLOR_WHITE}        Debian 12 · Docker · Tailscale VPN              ${COLOR_RESET}  ${COLOR_BOLD_BLUE}║${COLOR_RESET}"
+    echo -e "${COLOR_BOLD_BLUE}║${COLOR_RESET}                                                              ${COLOR_BOLD_BLUE}║${COLOR_RESET}"
+    echo -e "${COLOR_BOLD_BLUE}╚══════════════════════════════════════════════════════════════╝${COLOR_RESET}"
+    echo ""
+}

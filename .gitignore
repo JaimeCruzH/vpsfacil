@@ -1,0 +1,63 @@
+# ============================================================
+# VPSfacil - Archivos NUNCA deben subir a GitHub
+# ============================================================
+
+# --- Secretos y credenciales ---
+*.env
+.env
+.env.*
+!.env.example
+
+# --- Configuración de instalación (contiene dominio y usuario) ---
+setup.conf
+*.conf.local
+
+# --- Certificados SSL y llaves privadas ---
+*.pem
+*.key
+*.crt
+*.csr
+*.p12
+*.pfx
+
+# --- Carpeta de certificados ---
+apps/certs/
+
+# --- Backups ---
+apps/backups/
+backups/
+*.tar.gz
+*.tar.bz2
+*.zip
+
+# --- Datos persistentes de aplicaciones ---
+apps/*/data/
+apps/*/postgres/
+apps/*/cache/
+
+# --- Logs ---
+*.log
+logs/
+
+# --- Archivos temporales ---
+*.tmp
+*.bak
+*.swp
+*~
+
+# --- Sistema operativo ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Editor ---
+.vscode/settings.json
+*.code-workspace
+
+# --- Node (si se usa localmente para desarrollo) ---
+node_modules/
+npm-debug.log*
+
+# --- Python ---
+__pycache__/
+*.pyc
