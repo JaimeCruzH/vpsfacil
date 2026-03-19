@@ -1,0 +1,12 @@
+# Force LF line endings for all shell scripts
+# (prevents CRLF bugs when editing on Windows and running on Linux)
+
+* text=auto eol=lf
+
+*.sh text eol=lf
+*.md text eol=lf
+*.conf text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+*.env text eol=lf
+Dockerfile text eol=lf

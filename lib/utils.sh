@@ -137,6 +137,7 @@ prompt_input() {
     fi
 
     read -r respuesta
+    respuesta="${respuesta//$'\r'/}"  # strip CRLF artifacts
 
     if [[ -z "$respuesta" && -n "$default" ]]; then
         echo "$default"
