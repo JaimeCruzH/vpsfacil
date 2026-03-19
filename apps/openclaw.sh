@@ -26,6 +26,7 @@ LIB_DIR="${SCRIPT_DIR}/../lib"
 source "${LIB_DIR}/colors.sh"
 source "${LIB_DIR}/config.sh"
 source "${LIB_DIR}/utils.sh"
+source "${LIB_DIR}/portainer_api.sh"
 source_config
 
 # ============================================================
@@ -192,11 +193,22 @@ EOF
 chown "${ADMIN_USER}:${ADMIN_USER}" "${APP_DIR}/Dockerfile"
 
 # ============================================================
-# 6. CREAR DOCKER COMPOSE
+# 6. CONSTRUIR IMAGEN DOCKER
+# ============================================================
+log_step "Construyendo imagen Docker de OpenClaw"
+
+cd "$APP_DIR"
+log_process "Construyendo imagen (puede tardar 3-5 minutos la primera vez)..."
+docker build -t openclaw-vpsfacil:latest . 2>&1 | tail -10
+
+log_success "Imagen openclaw-vpsfacil:latest construida ✓"
+
+# ============================================================
+# 7. PREPARAR Y DESPLEGAR VÍA PORTAINER
 # ============================================================
 log_step "Generando docker-compose.yml"
 
-cat > "${APP_DIR}/docker-compose.yml" << EOF
+COMPOSE_CONTENT=$(cat << EOF
 # ============================================================
 # OpenClaw — VPSfacil
 # Acceso: http://openclaw.vpn.${DOMAIN}:${PORT_OPENCLAW_WS}
@@ -204,26 +216,24 @@ cat > "${APP_DIR}/docker-compose.yml" << EOF
 # ============================================================
 services:
   openclaw:
-    build: .
     image: openclaw-vpsfacil:latest
     container_name: openclaw
     restart: unless-stopped
-    env_file: .env
     environment:
       HOME: /home/node
       TERM: xterm
-      TZ: \${TZ}
-      OPENCLAW_GATEWAY_TOKEN: \${OPENCLAW_GATEWAY_TOKEN}
-      OPENCLAW_ALLOW_INSECURE_PRIVATE_WS: \${OPENCLAW_ALLOW_INSECURE_PRIVATE_WS}
-      CLAUDE_AI_SESSION_KEY: \${CLAUDE_AI_SESSION_KEY}
-      CLAUDE_WEB_SESSION_KEY: \${CLAUDE_WEB_SESSION_KEY}
-      CLAUDE_WEB_COOKIE: \${CLAUDE_WEB_COOKIE}
+      TZ: ${TIMEZONE}
+      OPENCLAW_GATEWAY_TOKEN: ${GATEWAY_TOKEN}
+      OPENCLAW_ALLOW_INSECURE_PRIVATE_WS: "true"
+      CLAUDE_AI_SESSION_KEY: ${CLAUDE_AI_SESSION_KEY}
+      CLAUDE_WEB_SESSION_KEY: ${CLAUDE_WEB_SESSION_KEY}
+      CLAUDE_WEB_COOKIE: ${CLAUDE_WEB_COOKIE}
     ports:
       - "${PORT_OPENCLAW_WS}:18789"
       - "${PORT_OPENCLAW_HTTP}:18790"
     volumes:
-      - ./config:/home/node/.openclaw
-      - ./data:/home/node/.openclaw/workspace
+      - ${APP_DIR}/config:/home/node/.openclaw
+      - ${APP_DIR}/data:/home/node/.openclaw/workspace
     healthcheck:
       test: ["CMD", "nc", "-z", "localhost", "18789"]
       interval: 30s
@@ -237,21 +247,23 @@ networks:
   vpsfacil-net:
     external: true
 EOF
+)
 
+# Guardar docker-compose.yml de referencia
+echo "$COMPOSE_CONTENT" > "${APP_DIR}/docker-compose.yml"
 chown "${ADMIN_USER}:${ADMIN_USER}" "${APP_DIR}/docker-compose.yml"
-log_success "docker-compose.yml creado ✓"
+log_success "docker-compose.yml generado ✓"
 
-# ============================================================
-# 7. CONSTRUIR Y DESPLEGAR
-# ============================================================
-log_step "Construyendo imagen Docker de OpenClaw"
+log_step "Desplegando OpenClaw via Portainer"
 
-cd "$APP_DIR"
-log_process "Construyendo imagen (puede tardar 3-5 minutos la primera vez)..."
-docker compose build 2>&1 | tail -10
-
-log_step "Desplegando OpenClaw"
-docker compose up -d
+log_process "Registrando stack en Portainer..."
+if portainer_deploy_stack "openclaw" "$COMPOSE_CONTENT"; then
+    log_process "Levantando contenedor..."
+else
+    log_warning "Portainer no disponible. Desplegando con docker compose directamente..."
+    cd "$APP_DIR"
+    docker compose up -d
+fi
 
 log_process "Esperando que OpenClaw inicie..."
 wait_for_port "localhost" "${PORT_OPENCLAW_WS}" "${TIMEOUT_APP_START}"

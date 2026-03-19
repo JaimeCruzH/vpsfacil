@@ -23,6 +23,7 @@ LIB_DIR="${SCRIPT_DIR}/../lib"
 source "${LIB_DIR}/colors.sh"
 source "${LIB_DIR}/config.sh"
 source "${LIB_DIR}/utils.sh"
+source "${LIB_DIR}/portainer_api.sh"
 source_config
 
 # ============================================================
@@ -119,33 +120,72 @@ wait_for_port "localhost" "9443" 60
 log_success "Portainer está corriendo ✓"
 
 # ============================================================
-# 4. INSTRUCCIONES DE ACCESO
+# 4. CONFIGURAR CUENTA DE ADMINISTRADOR VÍA API
 # ============================================================
-echo ""
-log_info "Portainer está listo. Para acceder por primera vez:"
+log_step "Configurando cuenta de administrador de Portainer"
+
+log_info "Crea las credenciales para acceder a Portainer:"
 echo ""
 
-windows_instruction "PRIMER ACCESO A PORTAINER
+PORTAINER_ADMIN=$(prompt_input "Nombre de usuario administrador" "admin")
+
+while true; do
+    PORTAINER_ADMIN_PASS=$(prompt_password "Contraseña (mínimo 12 caracteres)")
+    PORTAINER_ADMIN_PASS2=$(prompt_password "Confirma la contraseña")
+    if [[ "$PORTAINER_ADMIN_PASS" == "$PORTAINER_ADMIN_PASS2" && ${#PORTAINER_ADMIN_PASS} -ge 12 ]]; then
+        break
+    elif [[ "$PORTAINER_ADMIN_PASS" != "$PORTAINER_ADMIN_PASS2" ]]; then
+        log_warning "Las contraseñas no coinciden."
+    else
+        log_warning "Mínimo 12 caracteres."
+    fi
+done
+
+log_process "Inicializando cuenta en Portainer (esperando que la API esté lista)..."
+sleep 5
+
+INIT_BODY=$(jq -n \
+    --arg u "$PORTAINER_ADMIN" \
+    --arg p "$PORTAINER_ADMIN_PASS" \
+    '{username:$u,password:$p}')
+
+INIT_RESP=$(curl -sk -X POST "${PORTAINER_URL}/api/users/admin/init" \
+    -H "Content-Type: application/json" \
+    -d "$INIT_BODY" 2>/dev/null)
+
+if echo "$INIT_RESP" | jq -e '.Id' > /dev/null 2>&1; then
+    log_success "Cuenta '${PORTAINER_ADMIN}' creada en Portainer ✓"
+else
+    INIT_MSG=$(echo "$INIT_RESP" | jq -r '.message // "sin detalles"' 2>/dev/null)
+    log_warning "Respuesta de Portainer: ${INIT_MSG}"
+    log_info   "Si la cuenta ya existía, usa las credenciales que configuraste."
+fi
+
+# Guardar credenciales para uso automático por todas las apps
+portainer_save_creds "$PORTAINER_ADMIN" "$PORTAINER_ADMIN_PASS"
+log_success "Credenciales guardadas → las apps se desplegarán automáticamente en Portainer ✓"
+
+# ============================================================
+# 5. INSTRUCCIONES DE ACCESO
+# ============================================================
+echo ""
+windows_instruction "ACCESO A PORTAINER
 
 1. Asegúrate de tener Tailscale VPN activo en Windows
 
 2. Abre tu navegador y ve a:
    ${URL_PORTAINER}
 
-3. La primera vez te pedirá crear un usuario administrador:
-   - Ingresa un nombre de usuario (ej: admin)
-   - Ingresa una contraseña segura (mínimo 12 caracteres)
-   - Haz clic en 'Create user'
+3. Ingresa tus credenciales:
+   Usuario:    ${PORTAINER_ADMIN}
+   Contraseña: (la que acabas de configurar)
 
-4. En la siguiente pantalla selecciona:
+4. En la pantalla de inicio, selecciona:
    'Get Started' → 'local'
 
-5. Ya puedes ver y gestionar todos tus contenedores Docker
-
-NOTA: El navegador puede mostrar una advertencia de certificado
-la primera vez. Esto es normal — el certificado de Cloudflare
-Origin requiere que el dominio resuelva a la IP de Tailscale.
-Acepta la excepción de seguridad."
+5. Ya puedes ver y gestionar todos tus contenedores Docker.
+   Cada aplicación que instales aparecerá como un stack
+   editable en la sección 'Stacks'."
 
 # ============================================================
 # RESUMEN FINAL
@@ -157,6 +197,7 @@ log_success "Portainer instalado exitosamente"
 echo ""
 echo -e "  ${COLOR_BOLD_WHITE}Acceso:${COLOR_RESET}"
 echo -e "    URL:          ${COLOR_CYAN}${URL_PORTAINER}${COLOR_RESET}"
+echo -e "    Usuario:      ${COLOR_CYAN}${PORTAINER_ADMIN}${COLOR_RESET}"
 echo -e "    Acceso:       ${COLOR_YELLOW}Solo con Tailscale VPN activo${COLOR_RESET}"
 echo -e "    Certificado:  ${COLOR_GREEN}Let's Encrypt (renovación automática)${COLOR_RESET}"
 echo ""

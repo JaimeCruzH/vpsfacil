@@ -22,6 +22,7 @@ LIB_DIR="${SCRIPT_DIR}/../lib"
 source "${LIB_DIR}/colors.sh"
 source "${LIB_DIR}/config.sh"
 source "${LIB_DIR}/utils.sh"
+source "${LIB_DIR}/portainer_api.sh"
 source_config
 
 # ============================================================
@@ -133,11 +134,16 @@ chown "${ADMIN_USER}:${ADMIN_USER}" "${APP_DIR}/.env"
 log_success "Archivo .env creado ✓"
 
 # ============================================================
-# 5. CREAR DOCKER COMPOSE
+# 5. PREPARAR Y DESPLEGAR VÍA PORTAINER
 # ============================================================
 log_step "Generando docker-compose.yml"
 
-cat > "${APP_DIR}/docker-compose.yml" << EOF
+# Variables de base de datos (fijas para este stack)
+DB_USER="n8n_user"
+DB_NAME="n8n_db"
+DB_HOST="postgres_n8n"
+
+COMPOSE_CONTENT=$(cat << EOF
 # ============================================================
 # N8N + PostgreSQL — VPSfacil
 # Acceso: https://n8n.vpn.${DOMAIN}:${PORT_N8N}
@@ -149,13 +155,13 @@ services:
     container_name: postgres_n8n
     restart: unless-stopped
     environment:
-      POSTGRES_USER: \${DB_USER}
-      POSTGRES_PASSWORD: \${DB_PASSWORD}
-      POSTGRES_DB: \${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASS}
+      POSTGRES_DB: ${DB_NAME}
     volumes:
-      - ./postgres:/var/lib/postgresql/data
+      - ${APP_DIR}/postgres:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U \${DB_USER} -d \${DB_NAME}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -169,32 +175,37 @@ services:
     depends_on:
       postgres_n8n:
         condition: service_healthy
-    env_file: .env
     environment:
       DB_TYPE: postgresdb
-      DB_POSTGRESDB_HOST: \${DB_HOST}
+      DB_POSTGRESDB_HOST: ${DB_HOST}
       DB_POSTGRESDB_PORT: 5432
-      DB_POSTGRESDB_DATABASE: \${DB_NAME}
-      DB_POSTGRESDB_USER: \${DB_USER}
-      DB_POSTGRESDB_PASSWORD: \${DB_PASSWORD}
-      N8N_HOST: \${N8N_HOST}
-      N8N_PORT: \${N8N_PORT}
-      N8N_PROTOCOL: \${N8N_PROTOCOL}
-      WEBHOOK_URL: \${WEBHOOK_URL}
-      N8N_ENCRYPTION_KEY: \${N8N_ENCRYPTION_KEY}
-      GENERIC_TIMEZONE: \${GENERIC_TIMEZONE}
-      TZ: \${TZ}
+      DB_POSTGRESDB_DATABASE: ${DB_NAME}
+      DB_POSTGRESDB_USER: ${DB_USER}
+      DB_POSTGRESDB_PASSWORD: ${DB_PASS}
+      N8N_HOST: n8n.vpn.${DOMAIN}
+      N8N_PORT: ${PORT_N8N}
+      N8N_PROTOCOL: https
+      WEBHOOK_URL: https://n8n.vpn.${DOMAIN}:${PORT_N8N}
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
+      GENERIC_TIMEZONE: ${TIMEZONE}
+      TZ: ${TIMEZONE}
       N8N_BASIC_AUTH_ACTIVE: "false"
       N8N_USER_MANAGEMENT_DISABLED: "false"
       N8N_DEFAULT_BINARY_DATA_MODE: filesystem
       N8N_RUNNERS_ENABLED: "true"
-      N8N_EDITOR_BASE_URL: \${WEBHOOK_URL}
+      N8N_EDITOR_BASE_URL: https://n8n.vpn.${DOMAIN}:${PORT_N8N}
       N8N_SSL_CERT: /certs/cert.pem
       N8N_SSL_KEY: /certs/key.pem
+      N8N_EMAIL_MODE: ""
+      N8N_DIAGNOSTICS_ENABLED: "false"
+      N8N_DEFAULT_USER_EMAIL: ${N8N_EMAIL}
+      N8N_DEFAULT_USER_PASSWORD: ${N8N_PASS}
+      N8N_DEFAULT_USER_FIRSTNAME: ${N8N_FIRSTNAME}
+      N8N_DEFAULT_USER_LASTNAME: ${N8N_LASTNAME}
     ports:
       - "${PORT_N8N}:${PORT_N8N}"
     volumes:
-      - ./data:/home/node/.n8n
+      - ${APP_DIR}/data:/home/node/.n8n
       - ${CERT_FILE}:/certs/cert.pem:ro
       - ${CERT_KEY}:/certs/key.pem:ro
     networks:
@@ -207,19 +218,27 @@ networks:
   vpsfacil-net:
     external: true
 EOF
+)
 
+# Guardar docker-compose.yml de referencia
+echo "$COMPOSE_CONTENT" > "${APP_DIR}/docker-compose.yml"
 chown "${ADMIN_USER}:${ADMIN_USER}" "${APP_DIR}/docker-compose.yml"
-log_success "docker-compose.yml creado ✓"
+log_success "docker-compose.yml generado ✓"
 
 # ============================================================
 # 6. DESPLEGAR
 # ============================================================
-log_step "Desplegando N8N y PostgreSQL"
+log_step "Desplegando N8N y PostgreSQL via Portainer"
 
-cd "$APP_DIR"
-log_process "Descargando imágenes (puede tardar 2-4 minutos)..."
-docker compose pull 2>&1 | tail -5
-docker compose up -d
+log_process "Registrando stack en Portainer..."
+if portainer_deploy_stack "n8n" "$COMPOSE_CONTENT"; then
+    log_process "Descargando imágenes (puede tardar 2-4 minutos)..."
+else
+    log_warning "Portainer no disponible. Desplegando con docker compose directamente..."
+    cd "$APP_DIR"
+    docker compose pull 2>&1 | tail -5
+    docker compose up -d
+fi
 
 log_process "Esperando que PostgreSQL y N8N inicien..."
 wait_for_port "localhost" "${PORT_N8N}" "${TIMEOUT_APP_START}"

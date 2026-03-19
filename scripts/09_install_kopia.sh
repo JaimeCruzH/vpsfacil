@@ -25,6 +25,7 @@ LIB_DIR="${SCRIPT_DIR}/../lib"
 source "${LIB_DIR}/colors.sh"
 source "${LIB_DIR}/config.sh"
 source "${LIB_DIR}/utils.sh"
+source "${LIB_DIR}/portainer_api.sh"
 source_config
 
 # ============================================================
@@ -104,11 +105,11 @@ chown "${ADMIN_USER}:${ADMIN_USER}" "${APP_DIR}/.env"
 log_success "Archivo .env creado (600) ✓"
 
 # ============================================================
-# 4. CREAR DOCKER COMPOSE
+# 4. PREPARAR Y DESPLEGAR VÍA PORTAINER
 # ============================================================
 log_step "Generando configuración de Kopia"
 
-cat > "${APP_DIR}/docker-compose.yml" << EOF
+COMPOSE_CONTENT=$(cat << EOF
 # ============================================================
 # Kopia Backup — VPSfacil
 # Acceso: https://kopia.vpn.${DOMAIN}:51515
@@ -119,13 +120,15 @@ services:
     image: ${IMG_KOPIA}
     container_name: kopia
     restart: unless-stopped
-    env_file: .env
+    environment:
+      KOPIA_PASSWORD: ${KOPIA_PASS}
+      TZ: ${TIMEZONE}
     ports:
       - "51515:51515"
     volumes:
-      - ./config:/app/config
-      - ./cache:/app/cache
-      - ./logs:/app/logs
+      - ${APP_DIR}/config:/app/config
+      - ${APP_DIR}/cache:/app/cache
+      - ${APP_DIR}/logs:/app/logs
       - ${APPS_DIR}:/source:ro
       - ${BACKUP_DIR}:/backups
       - ${CERT_FILE}:/certs/cert.pem:ro
@@ -133,8 +136,8 @@ services:
     command: >
       server start
       --address=0.0.0.0:51515
-      --server-username=\${KOPIA_WEB_USER}
-      --server-password=\${KOPIA_WEB_PASS}
+      --server-username=${KOPIA_WEB_USER}
+      --server-password=${KOPIA_WEB_PASS}
       --tls-cert-file=/certs/cert.pem
       --tls-key-file=/certs/key.pem
     networks:
@@ -144,18 +147,27 @@ networks:
   vpsfacil-net:
     external: true
 EOF
+)
 
+# Guardar docker-compose.yml de referencia
+echo "$COMPOSE_CONTENT" > "${APP_DIR}/docker-compose.yml"
 chown "${ADMIN_USER}:${ADMIN_USER}" "${APP_DIR}/docker-compose.yml"
-log_success "docker-compose.yml creado ✓"
+log_success "Configuración generada ✓"
 
 # ============================================================
 # 5. DESPLEGAR KOPIA
 # ============================================================
-log_step "Desplegando Kopia"
+log_step "Desplegando Kopia via Portainer"
 
-cd "$APP_DIR"
-docker compose pull 2>&1 | tail -3
-docker compose up -d
+log_process "Registrando stack en Portainer..."
+if portainer_deploy_stack "kopia" "$COMPOSE_CONTENT"; then
+    log_process "Descargando imagen y levantando contenedor..."
+else
+    log_warning "Portainer no disponible. Desplegando con docker compose directamente..."
+    cd "$APP_DIR"
+    docker compose pull 2>&1 | tail -3
+    docker compose up -d
+fi
 
 log_process "Esperando que Kopia inicie..."
 wait_for_port "localhost" "${PORT_KOPIA}" 60

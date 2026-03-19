@@ -24,6 +24,7 @@ LIB_DIR="${SCRIPT_DIR}/../lib"
 source "${LIB_DIR}/colors.sh"
 source "${LIB_DIR}/config.sh"
 source "${LIB_DIR}/utils.sh"
+source "${LIB_DIR}/portainer_api.sh"
 source_config
 
 # ============================================================
@@ -115,11 +116,11 @@ EOF
 chown -R "${ADMIN_USER}:${ADMIN_USER}" "${APP_DIR}/config"
 
 # ============================================================
-# 5. CREAR DOCKER COMPOSE
+# 5. PREPARAR Y DESPLEGAR VÍA PORTAINER
 # ============================================================
 log_step "Generando docker-compose.yml"
 
-cat > "${APP_DIR}/docker-compose.yml" << EOF
+COMPOSE_CONTENT=$(cat << EOF
 # ============================================================
 # File Browser — VPSfacil
 # Acceso: https://files.vpn.${DOMAIN}:${PORT_FILEBROWSER}
@@ -130,13 +131,14 @@ services:
     image: ${IMG_FILEBROWSER}
     container_name: filebrowser
     restart: unless-stopped
-    env_file: .env
     user: "0:0"
+    environment:
+      TZ: ${TIMEZONE}
     ports:
       - "${PORT_FILEBROWSER}:8080"
     volumes:
-      - ./config:/config
-      - ./data:/srv/local
+      - ${APP_DIR}/config:/config
+      - ${APP_DIR}/data:/srv/local
       - ${APPS_DIR}:/srv/apps
       - ${ADMIN_HOME}:/srv/home:ro
       - ${CERT_FILE}:/certs/cert.pem:ro
@@ -149,19 +151,27 @@ networks:
   vpsfacil-net:
     external: true
 EOF
+)
 
+# Guardar docker-compose.yml de referencia
+echo "$COMPOSE_CONTENT" > "${APP_DIR}/docker-compose.yml"
 chown "${ADMIN_USER}:${ADMIN_USER}" "${APP_DIR}/docker-compose.yml"
-log_success "docker-compose.yml creado ✓"
+log_success "docker-compose.yml generado ✓"
 
 # ============================================================
 # 6. DESPLEGAR
 # ============================================================
-log_step "Desplegando File Browser"
+log_step "Desplegando File Browser via Portainer"
 
-cd "$APP_DIR"
-log_process "Descargando imagen..."
-docker compose pull 2>&1 | tail -3
-docker compose up -d
+log_process "Registrando stack en Portainer..."
+if portainer_deploy_stack "filebrowser" "$COMPOSE_CONTENT"; then
+    log_process "Descargando imagen y levantando contenedor..."
+else
+    log_warning "Portainer no disponible. Desplegando con docker compose directamente..."
+    cd "$APP_DIR"
+    docker compose pull 2>&1 | tail -3
+    docker compose up -d
+fi
 
 log_process "Esperando que File Browser inicie..."
 wait_for_port "localhost" "${PORT_FILEBROWSER}" 60
