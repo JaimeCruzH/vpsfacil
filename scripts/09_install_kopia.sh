@@ -179,35 +179,50 @@ log_success "Kopia está corriendo ✓"
 # ============================================================
 log_step "Configurando repositorio de backup local"
 
+log_process "Esperando que Kopia esté completamente listo (30s)..."
+sleep 30
+
 log_process "Inicializando repositorio de backup..."
 
-docker exec kopia kopia repository create filesystem \
-    --path=/backups \
-    --password="${KOPIA_PASS}" 2>/dev/null && \
-    log_success "Repositorio de backup creado ✓" || \
-    log_info "Repositorio ya existe (o se configurará desde la web)"
+# Verificar si el repositorio ya existe antes de crear
+if docker exec kopia kopia repository status 2>/dev/null | grep -q "Connected"; then
+    log_info "Repositorio ya existe y está conectado ✓"
+else
+    if docker exec kopia kopia repository create filesystem \
+        --path=/backups \
+        --password="${KOPIA_PASS}" 2>/dev/null; then
+        log_success "Repositorio de backup creado ✓"
 
-# Configurar snapshot de /source (= /apps del host)
-docker exec kopia kopia policy set /source \
-    --compression=zstd \
-    --keep-latest=7 \
-    --keep-daily=14 \
-    --keep-weekly=4 \
-    --keep-monthly=6 2>/dev/null && \
-    log_success "Política de retención configurada ✓" || \
-    log_info "Política se configurará desde la web"
+        # Configurar snapshot de /source (= /apps del host)
+        if docker exec kopia kopia policy set /source \
+            --compression=zstd \
+            --keep-latest=7 \
+            --keep-daily=14 \
+            --keep-weekly=4 \
+            --keep-monthly=6 2>/dev/null; then
+            log_success "Política de retención configurada ✓"
+        fi
 
-# Configurar schedule automático (diario a las 2 AM)
-docker exec kopia kopia policy set /source \
-    --schedule="0 2 * * *" 2>/dev/null && \
-    log_success "Backup automático: diario a las 2:00 AM ✓" || \
-    log_info "Schedule se configurará desde la web"
+        # Configurar schedule automático (diario a las 2 AM)
+        if docker exec kopia kopia policy set /source \
+            --schedule="0 2 * * *" 2>/dev/null; then
+            log_success "Backup automático: diario a las 2:00 AM ✓"
+        fi
 
-# Primer backup
-log_process "Ejecutando primer backup (puede tardar varios minutos)..."
-docker exec kopia kopia snapshot create /source 2>/dev/null && \
-    log_success "Primer backup completado ✓" || \
-    log_warning "Primer backup falló — configura desde la interfaz web"
+        # Primer backup
+        log_process "Ejecutando primer backup (puede tardar varios minutos)..."
+        if docker exec kopia kopia snapshot create /source 2>/dev/null; then
+            log_success "Primer backup completado ✓"
+        else
+            log_warning "Primer backup falló — confíguralo desde la interfaz web"
+        fi
+    else
+        log_warning "No se pudo inicializar el repositorio automáticamente."
+        log_info    "Accede a ${URL_KOPIA} y selecciona 'Local Directory or NAS'"
+        log_info    "  Path:     /backups"
+        log_info    "  Password: (la que ingresaste al instalar Kopia)"
+    fi
+fi
 
 # ============================================================
 # 7. INSTRUCCIONES DE ACCESO
