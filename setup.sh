@@ -810,32 +810,39 @@ echo ""
 log_step "Paso 5 - Instalar Tailscale VPN"
 run_phase_script "05_install_tailscale.sh" || { log_error "Paso 5 falló"; exit 1; }
 
-# Recolectar credenciales Portainer y Kopia
+# ============================================================
+# FASE A COMPLETADA - PARAR AQUÍ
+# ============================================================
 echo ""
-log_step "Recolectando datos para instalación automática"
-echo ""
-collect_all_inputs
-
 echo ""
 print_separator
 echo ""
 log_success "✓ FASE A completada exitosamente"
 echo ""
-echo -e "${COLOR_BOLD_WHITE}Ahora comienza FASE B (instalación de aplicaciones core)${COLOR_RESET}"
+echo -e "${COLOR_BOLD_WHITE}Hasta aquí llegamos con la ventana del usuario ROOT${COLOR_RESET}"
+echo -e "${COLOR_BOLD_WHITE}═══════════════════════════════════════════════════════${COLOR_RESET}"
 echo ""
-log_success "PRÓXIMO PASO - Abre una NUEVA ventana de Bitvise SSH con:"
+log_warning "IMPORTANTE: No continúes en esta ventana"
+log_warning "IMPORTANTE: Cierra esta ventana de root DESPUÉS del siguiente paso"
 echo ""
-echo -e "   ${COLOR_BOLD_WHITE}Host:${COLOR_RESET}     Tu IP de VPS"
-echo -e "   ${COLOR_BOLD_WHITE}Usuario:${COLOR_RESET}  ${ADMIN_USER}"
-echo -e "   ${COLOR_BOLD_WHITE}Auth:${COLOR_RESET}     publickey → ${ADMIN_USER}_key.pem"
+echo -e "${COLOR_BOLD_WHITE}PRÓXIMO PASO:${COLOR_RESET}"
 echo ""
-log_success "En esa ventana (como ${ADMIN_USER}), ejecuta:"
+log_info "1. Abre una NUEVA ventana de Bitvise SSH con:"
 echo ""
-echo -e "   ${COLOR_CYAN}curl -sSL \"${REPO_RAW}/scripts/install_core.sh?v=\$(date +%s)\" > ~/install_core.sh && bash ~/install_core.sh${COLOR_RESET}"
+echo -e "   ${COLOR_BOLD_CYAN}Host:${COLOR_RESET}     Tu IP de VPS"
+echo -e "   ${COLOR_BOLD_CYAN}Usuario:${COLOR_RESET}  ${ADMIN_USER}"
+echo -e "   ${COLOR_BOLD_CYAN}Auth:${COLOR_RESET}     publickey → ${ADMIN_USER}_key.pem"
 echo ""
-log_success "O si descargaste el archivo:"
+log_info "2. En esa nueva ventana (conectado como ${ADMIN_USER}), ejecuta:"
 echo ""
-echo -e "   ${COLOR_CYAN}bash ~/install_core.sh${COLOR_RESET}"
+echo -e "   ${COLOR_BOLD_GREEN}curl -sSL \"${REPO_RAW}/scripts/install_core.sh?v=\$(date +%s)\" > ~/install_core.sh && bash ~/install_core.sh${COLOR_RESET}"
+echo ""
+log_info "   O si descargaste el archivo localmente:"
+echo ""
+echo -e "   ${COLOR_BOLD_GREEN}bash ~/install_core.sh${COLOR_RESET}"
+echo ""
+log_info "3. Una vez completada la instalación en la nueva ventana,"
+log_info "   puedes cerrar ESTA ventana del usuario root."
 echo ""
 print_separator
 echo ""
