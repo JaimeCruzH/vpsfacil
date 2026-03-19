@@ -33,6 +33,28 @@ print_header "Paso 6 de 10 — Instalar Tailscale VPN"
 
 check_root
 
+# Definir funciones antes de cualquier uso
+_save_tailscale_ip() {
+    local ts_ip="$1"
+    local config_file="${ADMIN_HOME}/setup.conf"
+
+    if [[ -f "$config_file" ]]; then
+        if grep -q "^TAILSCALE_IP=" "$config_file"; then
+            sed -i "s|^TAILSCALE_IP=.*|TAILSCALE_IP=\"${ts_ip}\"|" "$config_file"
+        else
+            echo "TAILSCALE_IP=\"${ts_ip}\"" >> "$config_file"
+        fi
+        chown "${ADMIN_USER}:${ADMIN_USER}" "$config_file"
+    fi
+}
+
+_apply_tailscale_ufw() {
+    if command -v ufw &>/dev/null; then
+        ufw allow in on tailscale0 comment "Permitir todo tráfico VPN Tailscale" 2>/dev/null || true
+        log_success "UFW: tráfico entrante por Tailscale VPN permitido ✓"
+    fi
+}
+
 log_info "Tailscale crea una red privada segura entre tu PC y el servidor."
 log_info "Es la clave de la arquitectura: todas las apps solo son"
 log_info "accesibles cuando Tailscale está activo en tu dispositivo."
@@ -59,6 +81,7 @@ if command_exists tailscale; then
         if [[ -n "$TAILSCALE_IP" ]]; then
             log_success "Tailscale ya está conectado. IP VPN: ${TAILSCALE_IP} ✓"
             _save_tailscale_ip "$TAILSCALE_IP"
+            _apply_tailscale_ufw
             log_info "Próximo paso: Configurar Certificados SSL (opción 7)"
             exit 0
         fi
@@ -182,40 +205,15 @@ if [[ -z "$TAILSCALE_IP" ]]; then
 fi
 
 # ============================================================
-# 5. GUARDAR IP DE TAILSCALE EN CONFIGURACIÓN
+# 5. GUARDAR IP Y CONFIGURAR UFW
 # ============================================================
-_save_tailscale_ip() {
-    local ts_ip="$1"
-    local config_file="${ADMIN_HOME}/setup.conf"
-
-    if [[ -f "$config_file" ]]; then
-        if grep -q "^TAILSCALE_IP=" "$config_file"; then
-            sed -i "s|^TAILSCALE_IP=.*|TAILSCALE_IP=\"${ts_ip}\"|" "$config_file"
-        else
-            echo "TAILSCALE_IP=\"${ts_ip}\"" >> "$config_file"
-        fi
-        chown "${ADMIN_USER}:${ADMIN_USER}" "$config_file"
-    fi
-}
-
 log_step "Guardando IP de Tailscale en configuración"
 
 _save_tailscale_ip "$TAILSCALE_IP"
 log_success "IP Tailscale guardada: ${TAILSCALE_IP} ✓"
 
-# ============================================================
-# Permitir todo el tráfico entrante por la interfaz Tailscale
-# Esto es necesario para que las apps (Portainer, N8N, etc.)
-# sean accesibles desde la VPN sin abrir puertos al internet.
-# ============================================================
 log_step "Configurando UFW para tráfico Tailscale"
-
-if command -v ufw &>/dev/null; then
-    ufw allow in on tailscale0 comment "Permitir todo tráfico VPN Tailscale" 2>/dev/null || true
-    log_success "UFW: tráfico entrante por Tailscale VPN permitido ✓"
-else
-    log_info "UFW no instalado aún — la regla se aplicará en el paso 4"
-fi
+_apply_tailscale_ufw
 
 # ============================================================
 # 6. VERIFICAR CONECTIVIDAD DESDE PC WINDOWS
