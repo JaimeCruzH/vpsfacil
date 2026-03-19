@@ -68,8 +68,9 @@ log_step "Generando configuración de Portainer"
 cat > "${APP_DIR}/docker-compose.yml" << EOF
 # ============================================================
 # Portainer CE — VPSfacil
-# Acceso: https://portainer.vpn.${DOMAIN}:9000
+# Acceso: https://portainer.vpn.${DOMAIN}:9443
 # Solo vía Tailscale VPN
+# Nota: en Portainer 2.x el puerto 9443 es HTTPS, 9000 es HTTP
 # ============================================================
 services:
   portainer:
@@ -79,16 +80,17 @@ services:
     security_opt:
       - no-new-privileges:true
     ports:
-      - "9000:9000"
+      - "9443:9443"
+      - "8000:8000"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./data:/data
       - ${CERT_FILE}:/certs/cert.pem:ro
       - ${CERT_KEY}:/certs/key.pem:ro
     command: >
-      --ssl
-      --sslcert /certs/cert.pem
-      --sslkey /certs/key.pem
+      --tlsverify
+      --tlscert /certs/cert.pem
+      --tlskey /certs/key.pem
     networks:
       - vpsfacil-net
 
@@ -112,7 +114,7 @@ docker compose pull 2>&1 | tail -3
 docker compose up -d
 
 log_process "Esperando que Portainer inicie..."
-wait_for_port "localhost" "${PORT_PORTAINER}" 60
+wait_for_port "localhost" "9443" 60
 
 log_success "Portainer está corriendo ✓"
 

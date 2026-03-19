@@ -179,7 +179,7 @@ _derive_config_vars() {
     export CF_WILDCARD="*.vpn.${DOMAIN}"              # *.vpn.agentexperto.work
 
     # URLs de cada aplicación (via Tailscale VPN)
-    export URL_PORTAINER="https://portainer.vpn.${DOMAIN}:9000"
+    export URL_PORTAINER="https://portainer.vpn.${DOMAIN}:9443"
     export URL_N8N="https://n8n.vpn.${DOMAIN}:5678"
     export URL_FILEBROWSER="https://files.vpn.${DOMAIN}:8080"
     export URL_OPENCLAW="https://openclaw.vpn.${DOMAIN}:18789"
@@ -231,7 +231,7 @@ EOF
 # Puertos internos de aplicaciones
 readonly PORT_SSH="22"
 readonly PORT_TAILSCALE="41641"
-readonly PORT_PORTAINER="9000"
+readonly PORT_PORTAINER="9443"
 readonly PORT_N8N="5678"
 readonly PORT_FILEBROWSER="8080"
 readonly PORT_OPENCLAW_WS="18789"
