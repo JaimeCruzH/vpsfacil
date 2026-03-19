@@ -219,7 +219,10 @@ print_separator
 echo ""
 
 # Mostrar progreso actual (si hay instalación previa)
+# Desactivar set -e temporalmente para progress_show
+set +e
 progress_show
+set -e
 wait_for_user "Presiona Enter para continuar..."
 
 # Verificar que NO es root
