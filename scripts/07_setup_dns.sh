@@ -24,12 +24,25 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)" || SCRIPT_DIR=""
 LIB_DIR="${SCRIPT_DIR}/../lib"
-source "${LIB_DIR}/colors.sh"
-source "${LIB_DIR}/config.sh"
-source "${LIB_DIR}/utils.sh"
-source_config
+
+# Si las librerías no existen donde se esperan, asumir ejecución remota y limpiar SCRIPT_DIR
+if [[ ! -f "${LIB_DIR}/colors.sh" ]] 2>/dev/null; then
+    SCRIPT_DIR=""
+fi
+
+# Si se ejecuta remotamente (vía curl | bash), descargar librerías desde GitHub
+if [[ -z "$SCRIPT_DIR" ]] || [[ ! -f "${LIB_DIR}/colors.sh" ]]; then
+    REPO_RAW="https://raw.githubusercontent.com/JaimeCruzH/vpsfacil/main"
+    LIB_DIR="/tmp/vpsfacil_lib_$$"
+    mkdir -p "$LIB_DIR"
+    curl -sSL "${REPO_RAW}/lib/colors.sh"  -o "${LIB_DIR}/colors.sh"
+    curl -sSL "${REPO_RAW}/lib/config.sh"  -o "${LIB_DIR}/config.sh"
+    curl -sSL "${REPO_RAW}/lib/utils.sh"   -o "${LIB_DIR}/utils.sh"
+    curl -sSL "${REPO_RAW}/lib/portainer_api.sh" -o "${LIB_DIR}/portainer_api.sh" 2>/dev/null || true
+fi
+
 
 # ============================================================
 print_header "Paso 8 de 10 — Configurar DNS en Cloudflare"
