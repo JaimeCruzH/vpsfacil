@@ -21,8 +21,13 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)" || SCRIPT_DIR=""
 LIB_DIR="${SCRIPT_DIR}/../lib"
 
+# Si las librerías no existen donde se esperan, asumir ejecución remota y limpiar SCRIPT_DIR
+if [[ ! -f "${LIB_DIR}/colors.sh" ]] 2>/dev/null; then
+    SCRIPT_DIR=""
+fi
+
 # Si se ejecuta remotamente (vía curl | bash), descargar librerías desde GitHub
-if [[ ! -d "$LIB_DIR" ]] || [[ ! -f "${LIB_DIR}/colors.sh" ]]; then
+if [[ -z "$SCRIPT_DIR" ]] || [[ ! -f "${LIB_DIR}/colors.sh" ]]; then
     REPO_RAW="https://raw.githubusercontent.com/JaimeCruzH/vpsfacil/main"
     LIB_DIR="/tmp/vpsfacil_lib_$$"
     mkdir -p "$LIB_DIR"
