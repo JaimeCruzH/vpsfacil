@@ -25,10 +25,10 @@ portainer_save_creds() {
     local password="$2"
 
     mkdir -p "$(dirname "$PORTAINER_CREDS_FILE")"
-    cat > "$PORTAINER_CREDS_FILE" << EOF
-PORTAINER_USER="${username}"
-PORTAINER_PASS="${password}"
-EOF
+    # printf '%q' escapes $, spaces y caracteres especiales para que
+    # el archivo pueda ser sourced sin errores de "unbound variable"
+    printf 'PORTAINER_USER=%q\n' "$username" >  "$PORTAINER_CREDS_FILE"
+    printf 'PORTAINER_PASS=%q\n' "$password" >> "$PORTAINER_CREDS_FILE"
     chmod 600 "$PORTAINER_CREDS_FILE"
     chown "${ADMIN_USER}:${ADMIN_USER}" "$PORTAINER_CREDS_FILE"
 }
