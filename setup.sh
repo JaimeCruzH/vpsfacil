@@ -23,24 +23,26 @@ else
     SCRIPT_DIR=""
 fi
 
-# Cuando se ejecuta via curl (bash <(curl ...)), SCRIPT_DIR estará vacío.
-# En ese caso, descargamos libs desde GitHub.
-if [[ "$SCRIPT_DIR" == "" || "$SCRIPT_DIR" == "/dev/fd" || "$SCRIPT_DIR" == "/proc/"* ]]; then
-    # Ejecución via curl — descargar librerías temporalmente
-    REPO_RAW="https://raw.githubusercontent.com/JaimeCruzH/vpsfacil/main"
-    TMP_LIB="/tmp/vpsfacil_lib"
-    mkdir -p "$TMP_LIB"
-    curl -sSL "${REPO_RAW}/lib/colors.sh"            -o "${TMP_LIB}/colors.sh"
-    curl -sSL "${REPO_RAW}/lib/config.sh"            -o "${TMP_LIB}/config.sh"
-    curl -sSL "${REPO_RAW}/lib/utils.sh"             -o "${TMP_LIB}/utils.sh"
-    curl -sSL "${REPO_RAW}/lib/menu.sh"              -o "${TMP_LIB}/menu.sh"
-    curl -sSL "${REPO_RAW}/lib/install_prompts.sh"   -o "${TMP_LIB}/install_prompts.sh"
-    curl -sSL "${REPO_RAW}/lib/portainer_api.sh"     -o "${TMP_LIB}/portainer_api.sh"
-    LIB_DIR="$TMP_LIB"
+# Determinar si es ejecución remota (descargar librerías)
+REMOTE_INSTALL=false
+if [[ "$SCRIPT_DIR" == "" || "$SCRIPT_DIR" == "/dev/fd" || "$SCRIPT_DIR" == "/proc/"* || "$SCRIPT_DIR" == "/tmp" ]]; then
     REMOTE_INSTALL=true
+fi
+
+# Si es remota, descargar librerías desde GitHub
+if [[ "$REMOTE_INSTALL" == "true" ]]; then
+    REPO_RAW="https://raw.githubusercontent.com/JaimeCruzH/vpsfacil/main"
+    LIB_DIR="/tmp/vpsfacil_lib"
+    mkdir -p "$LIB_DIR"
+    curl -sSL "${REPO_RAW}/lib/colors.sh"            -o "${LIB_DIR}/colors.sh"
+    curl -sSL "${REPO_RAW}/lib/config.sh"            -o "${LIB_DIR}/config.sh"
+    curl -sSL "${REPO_RAW}/lib/utils.sh"             -o "${LIB_DIR}/utils.sh"
+    curl -sSL "${REPO_RAW}/lib/menu.sh"              -o "${LIB_DIR}/menu.sh"
+    curl -sSL "${REPO_RAW}/lib/install_prompts.sh"   -o "${LIB_DIR}/install_prompts.sh"
+    curl -sSL "${REPO_RAW}/lib/portainer_api.sh"     -o "${LIB_DIR}/portainer_api.sh"
 else
+    # Ejecución local — usar librerías del repo
     LIB_DIR="${SCRIPT_DIR}/lib"
-    REMOTE_INSTALL=false
 fi
 
 # shellcheck source=lib/colors.sh
