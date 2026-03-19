@@ -3,7 +3,7 @@
 # apps/filebrowser.sh — Instalar File Browser
 # VPSfacil - Sistema Automatizado de Instalación en VPS
 #
-# Acceso: https://files.vpn.DOMAIN:8080 (solo Tailscale VPN)
+# Acceso: http://files.vpn.DOMAIN:8080 (solo Tailscale VPN)
 # Credenciales por defecto: admin / admin
 # Requisitos: ejecutar como root
 # ============================================================
@@ -50,8 +50,9 @@ if docker ps -aq --filter "name=filebrowser" 2>/dev/null | grep -q .; then
 fi
 
 # Eliminar base de datos para que arranque con admin/admin
-if [[ -f "${APP_DIR}/filebrowser.db" ]]; then
-    rm -f "${APP_DIR}/filebrowser.db"
+# (el archivo vive dentro del directorio db/, no como bind-mount de archivo)
+if [[ -f "${APP_DIR}/db/filebrowser.db" ]]; then
+    rm -f "${APP_DIR}/db/filebrowser.db"
     log_success "Base de datos limpiada ✓"
 fi
 
@@ -60,6 +61,7 @@ fi
 # ============================================================
 log_step "Creando estructura de directorios"
 
+mkdir -p "${APP_DIR}/db"
 mkdir -p "${APP_DIR}/data"
 chown -R "${ADMIN_USER}:${ADMIN_USER}" "$APP_DIR"
 log_success "Directorio: ${APP_DIR} ✓"
@@ -69,8 +71,10 @@ log_success "Directorio: ${APP_DIR} ✓"
 # ============================================================
 log_step "Generando docker-compose.yml"
 
-# La base de datos se monta directamente como archivo en /database.db
-# (ubicación por defecto del contenedor oficial de File Browser)
+# La base de datos se monta como directorio (db/ → /db) y File Browser
+# crea el archivo /db/filebrowser.db desde cero con admin/admin por defecto.
+# Esto es crítico: montar un archivo vacío como bind-mount hace que BoltDB
+# falle silenciosamente sin crear el usuario admin.
 COMPOSE_CONTENT=$(cat << EOF
 # ============================================================
 # File Browser — VPSfacil
@@ -90,12 +94,12 @@ services:
     ports:
       - "${PORT_FILEBROWSER}:8080"
     volumes:
-      - ${APP_DIR}/filebrowser.db:/database.db
+      - ${APP_DIR}/db:/db
       - ${APP_DIR}/data:/srv/local
       - ${APPS_DIR}:/srv/apps
       - ${ADMIN_HOME}:/srv/home:ro
     command: >
-      --database /database.db
+      --database /db/filebrowser.db
       --root /srv
       --address 0.0.0.0
       --port 8080
@@ -111,11 +115,6 @@ EOF
 echo "$COMPOSE_CONTENT" > "${APP_DIR}/docker-compose.yml"
 chown "${ADMIN_USER}:${ADMIN_USER}" "${APP_DIR}/docker-compose.yml"
 log_success "docker-compose.yml generado ✓"
-
-# Crear archivo vacío para la base de datos ANTES de montar
-# (evita que Docker lo cree como directorio)
-touch "${APP_DIR}/filebrowser.db"
-chown "${ADMIN_USER}:${ADMIN_USER}" "${APP_DIR}/filebrowser.db"
 
 # ============================================================
 # 4. DESPLEGAR
