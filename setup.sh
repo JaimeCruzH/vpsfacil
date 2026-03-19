@@ -480,7 +480,32 @@ ask_initial_config() {
     TIMEZONE=$(prompt_input "¿Cuál es tu zona horaria?" "America/Santiago")
 
     echo ""
+    print_separator
+    echo ""
 
+    # Pedir contraseña del nuevo usuario
+    log_step "Contraseña del usuario administrador"
+    echo ""
+    log_info "Define una contraseña para el usuario '${ADMIN_USER}'."
+    log_warning "Esta contraseña la necesitarás ocasionalmente para sudo."
+    echo ""
+
+    while true; do
+        ADMIN_PASS=$(prompt_password "Ingresa la contraseña para '${ADMIN_USER}'")
+        ADMIN_PASS2=$(prompt_password "Confirma la contraseña")
+
+        if [[ "$ADMIN_PASS" == "$ADMIN_PASS2" ]]; then
+            if [[ ${#ADMIN_PASS} -lt 8 ]]; then
+                log_warning "La contraseña debe tener al menos 8 caracteres. Intenta de nuevo."
+            else
+                break
+            fi
+        else
+            log_warning "Las contraseñas no coinciden. Intenta de nuevo."
+        fi
+    done
+
+    echo ""
     print_separator
     log_info "Resumen de configuración:"
     echo ""
@@ -521,6 +546,9 @@ _derive_config_vars() {
     export CERT_FILE="${CERTS_DIR}/origin-cert.pem"
     export CERT_KEY="${CERTS_DIR}/origin-cert-key.pem"
     export CERT_CA="${CERTS_DIR}/cloudflare-ca.crt"
+
+    # Exportar contraseña del usuario admin para scripts child
+    export ADMIN_PASS="${ADMIN_PASS:-}"
 }
 
 save_config() {

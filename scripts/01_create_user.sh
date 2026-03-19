@@ -80,27 +80,35 @@ fi
 if [[ "$USUARIO_NUEVO" == "true" ]]; then
     log_step "Creando usuario ${ADMIN_USER}"
 
-    # Pedir contraseña para el nuevo usuario
-    echo ""
-    log_info "Define una contraseña para el usuario '${ADMIN_USER}'."
-    log_info "Esta contraseña la necesitarás ocasionalmente para sudo."
-    log_warning "Guarda esta contraseña en un lugar seguro (ej: gestor de contraseñas)"
-    echo ""
+    # Obtener contraseña desde setup.sh (vía ADMIN_PASS) o pedir si no existe
+    if [[ -z "${ADMIN_PASS:-}" ]]; then
+        # Modo retrocompatible: pedir contraseña si no viene de setup.sh
+        echo ""
+        log_info "Define una contraseña para el usuario '${ADMIN_USER}'."
+        log_info "Esta contraseña la necesitarás ocasionalmente para sudo."
+        log_warning "Guarda esta contraseña en un lugar seguro (ej: gestor de contraseñas)"
+        echo ""
 
-    while true; do
-        PASS1=$(prompt_password "Ingresa la contraseña para '${ADMIN_USER}'")
-        PASS2=$(prompt_password "Confirma la contraseña")
+        while true; do
+            PASS1=$(prompt_password "Ingresa la contraseña para '${ADMIN_USER}'")
+            PASS2=$(prompt_password "Confirma la contraseña")
 
-        if [[ "$PASS1" == "$PASS2" ]]; then
-            if [[ ${#PASS1} -lt 8 ]]; then
-                log_warning "La contraseña debe tener al menos 8 caracteres. Intenta de nuevo."
+            if [[ "$PASS1" == "$PASS2" ]]; then
+                if [[ ${#PASS1} -lt 8 ]]; then
+                    log_warning "La contraseña debe tener al menos 8 caracteres. Intenta de nuevo."
+                else
+                    break
+                fi
             else
-                break
+                log_warning "Las contraseñas no coinciden. Intenta de nuevo."
             fi
-        else
-            log_warning "Las contraseñas no coinciden. Intenta de nuevo."
-        fi
-    done
+        done
+        ADMIN_PASS="$PASS1"
+        unset PASS1 PASS2
+    else
+        # Contraseña viene de setup.sh
+        log_info "Usando contraseña configurada en el paso anterior"
+    fi
 
     # Crear usuario con home directory y shell bash
     useradd \
@@ -110,8 +118,7 @@ if [[ "$USUARIO_NUEVO" == "true" ]]; then
         "$ADMIN_USER"
 
     # Asignar contraseña
-    echo "${ADMIN_USER}:${PASS1}" | chpasswd
-    unset PASS1 PASS2
+    echo "${ADMIN_USER}:${ADMIN_PASS}" | chpasswd
 
     log_success "Usuario '${ADMIN_USER}' creado con home en /home/${ADMIN_USER} ✓"
 fi
