@@ -224,11 +224,11 @@ set +e
 progress_show
 set -e
 
-# Esperar confirmación del usuario (con timeout)
+# Esperar confirmación del usuario
 echo ""
-echo -e "${PREFIX_PROMPT} Presiona Enter para continuar..."
-# Usar timeout para leer, con fallback a sleep
-timeout 5 read -r < /dev/tty 2>/dev/null || true
+echo -e "${PREFIX_PROMPT} Presiona Enter para continuar (o espera 5 segundos)..."
+# Intentar leer, con timeout de 5 segundos
+read -r -t 5 < /dev/tty 2>/dev/null || sleep 2
 
 # Verificar que NO es root
 if [[ $EUID -eq 0 ]]; then
