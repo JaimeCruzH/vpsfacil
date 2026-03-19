@@ -353,3 +353,46 @@ windows_instruction() {
     echo -e "${COLOR_BOLD_YELLOW}└──────────────────────────────────────────────────────────┘${COLOR_RESET}"
     echo ""
 }
+
+# ============================================================
+# ESPERAR A QUE DPKG ESTÉ DISPONIBLE
+# ============================================================
+# Evita conflictos con unattended-upgr que bloquea dpkg
+# en VPS nuevos. Espera a que se libere el lock antes de
+# intentar usar apt-get o instalar paquetes.
+wait_for_dpkg() {
+    local locks=("/var/lib/dpkg/lock-frontend" "/var/lib/dpkg/lock" "/var/cache/apt/archives/lock")
+    local waited=0
+    local max_wait=300  # 5 minutos máximo
+
+    while true; do
+        local locked=false
+        for lock in "${locks[@]}"; do
+            if [[ -f "$lock" ]]; then
+                # Verificar si el proceso que tiene el lock sigue vivo
+                local lock_holder=$(lsof "$lock" 2>/dev/null | grep -v COMMAND | awk '{print $2}' | head -1)
+                if [[ -n "$lock_holder" ]] && ps -p "$lock_holder" > /dev/null 2>&1; then
+                    locked=true
+                    break
+                fi
+            fi
+        done
+
+        if ! $locked; then
+            return 0
+        fi
+
+        if [[ $waited -ge $max_wait ]]; then
+            log_warning "dpkg lock no se liberó después de $max_wait segundos"
+            log_info "Continuando de todas formas..."
+            return 1
+        fi
+
+        if [[ $((waited % 10)) -eq 0 ]]; then
+            log_process "Esperando a que se libere dpkg (${waited}s)..."
+        fi
+
+        sleep 2
+        waited=$((waited + 2))
+    done
+}

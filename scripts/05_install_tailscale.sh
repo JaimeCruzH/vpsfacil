@@ -110,6 +110,10 @@ else
     # ============================================================
     log_step "Instalando Tailscale"
 
+    # Esperar a que dpkg esté disponible
+    log_process "Esperando acceso a dpkg..."
+    wait_for_dpkg
+
     log_process "Descargando instalador oficial de Tailscale..."
     curl -fsSL https://tailscale.com/install.sh | sh 2>&1 | tail -5
 
