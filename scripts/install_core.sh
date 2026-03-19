@@ -178,9 +178,9 @@ echo ""
 progress_show
 
 # Calcular duración total
-local total_seconds=$(progress_get_total_duration)
-local total_mins=$((total_seconds / 60))
-local total_secs=$((total_seconds % 60))
+total_seconds=$(progress_get_total_duration)
+total_mins=$((total_seconds / 60))
+total_secs=$((total_seconds % 60))
 
 echo ""
 print_separator
