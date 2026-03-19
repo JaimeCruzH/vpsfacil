@@ -35,11 +35,10 @@ if [[ ! -f "${LIB_DIR}/colors.sh" ]]; then
     LIB_DIR="$TMP_LIB"
 fi
 
-# Cargar librerías
+# Cargar librerías BÁSICAS (sin dependencias de variables)
 source "${LIB_DIR}/colors.sh"
 source "${LIB_DIR}/config.sh"
 source "${LIB_DIR}/utils.sh"
-source "${LIB_DIR}/portainer_api.sh"
 
 # Cargar progreso (download si es remote)
 if [[ ! -f "${LIB_DIR}/progress.sh" ]]; then
@@ -171,6 +170,12 @@ source "$CONFIG_FILE"
 
 # Derivar variables adicionales
 _derive_config_vars
+
+# Cargar portainer_api (requiere APPS_DIR definido por _derive_config_vars)
+if [[ ! -f "${LIB_DIR}/portainer_api.sh" ]]; then
+    curl -sSL "${REPO_RAW}/lib/portainer_api.sh" -o "${LIB_DIR}/portainer_api.sh"
+fi
+source "${LIB_DIR}/portainer_api.sh"
 
 # Exportar para que los subscripts las hereden
 export DOMAIN ADMIN_USER TIMEZONE
