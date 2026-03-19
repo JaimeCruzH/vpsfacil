@@ -178,6 +178,13 @@ fi
 # Cargar configuración
 source "$CONFIG_FILE"
 
+# Si no tenemos credenciales de Portainer, pedir ahora (FASE B siempre necesita esto)
+if [[ -z "${PORTAINER_ADMIN:-}" ]]; then
+    log_info "Recolectando credenciales de instalación..."
+    echo ""
+    collect_all_inputs
+fi
+
 # Derivar variables adicionales
 _derive_config_vars
 
