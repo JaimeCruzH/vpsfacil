@@ -89,6 +89,13 @@ else
     ask_initial_config
 fi
 
+# Exportar variables para que los subscripts las hereden
+export DOMAIN ADMIN_USER TIMEZONE
+export ADMIN_HOME APPS_DIR CERTS_DIR BACKUP_DIR
+export VPN_SUBDOMAIN CF_WILDCARD
+export URL_PORTAINER URL_N8N URL_FILEBROWSER URL_OPENCLAW URL_KOPIA
+export CERT_FILE CERT_KEY CERT_CA
+
 # ============================================================
 # MENÚ PRINCIPAL
 # ============================================================

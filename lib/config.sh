@@ -22,28 +22,38 @@
 # Si NO existe → pide dominio y usuario al usuario
 # ============================================================
 source_config() {
-    local config_file="${HOME}/setup.conf"
+    # 1. Si las variables ya están en el entorno (heredadas de setup.sh), usarlas
+    if [[ -n "${DOMAIN:-}" && -n "${ADMIN_USER:-}" ]]; then
+        _derive_config_vars
+        return 0
+    fi
 
-    # Si el archivo de configuración existe, cargarlo
-    if [[ -f "$config_file" ]]; then
+    # 2. Buscar archivo de configuración en ubicaciones conocidas
+    local config_file=""
+    for candidate in \
+        "${HOME}/setup.conf" \
+        "/tmp/vpsfacil_setup.conf" \
+        "/root/setup.conf"
+    do
+        if [[ -f "$candidate" ]]; then
+            config_file="$candidate"
+            break
+        fi
+    done
+
+    if [[ -n "$config_file" ]]; then
         # shellcheck source=/dev/null
         source "$config_file"
         _derive_config_vars
         return 0
     fi
 
-    # Si no existe, puede que estemos en la primera ejecución
-    # En ese caso, setup.sh habrá preguntado y llamado a save_config()
-    # Pero si alguien ejecuta un subscript directamente, avisamos:
-    if [[ -z "${DOMAIN:-}" || -z "${ADMIN_USER:-}" ]]; then
-        echo ""
-        echo -e "\033[1;31m[✗]\033[0m Error: No se encontró configuración guardada"
-        echo -e "\033[0;34m[ℹ]\033[0m Ejecuta primero: bash setup.sh"
-        echo ""
-        exit 1
-    fi
-
-    _derive_config_vars
+    # 3. No se encontró configuración — el usuario debe ejecutar setup.sh primero
+    echo ""
+    echo -e "\033[1;31m[✗]\033[0m Error: No se encontró configuración guardada"
+    echo -e "\033[0;34m[ℹ]\033[0m Ejecuta primero: bash setup.sh"
+    echo ""
+    exit 1
 }
 
 # ============================================================
