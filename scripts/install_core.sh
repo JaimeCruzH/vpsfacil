@@ -149,7 +149,7 @@ KOPIA_PASS="${KOPIA_PASS}"
 INSTALLATION_MODE="automatic"
 EOF
 
-    chmod 600 "$config_file"
+    chmod 644 "$config_file"
     log_success "Configuración guardada en: $config_file ✓"
     echo ""
 }
