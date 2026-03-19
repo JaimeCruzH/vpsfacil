@@ -338,19 +338,20 @@ echo ""
 echo ""
 print_separator
 echo ""
-windows_instruction "CÓMO CONTINUAR LA INSTALACIÓN DESDE AHORA
+windows_instruction "VERIFICACIÓN RÁPIDA (Opcional)
 
-Desde este punto usarás el usuario '${ADMIN_USER}' para todo.
-Ya NO necesitas conectarte como root.
-
-PASO A: Abre una nueva conexión en Bitvise con:
+Puedes verificar que la conexión funciona abriendo una nueva ventana Bitvise con:
    Host:     IP de tu VPS
    Puerto:   ${SSH_PORT:-22}
    Usuario:  ${ADMIN_USER}
    Auth:     publickey → selecciona ${ADMIN_USER}_key.pem
 
-PASO B: Una vez conectado como '${ADMIN_USER}', ejecuta:
-   sudo bash /opt/vpsfacil/setup.sh
+Sin embargo, NO necesitas cambiar ahora. La instalación continuará
+en ESTA ventana (como root) con los siguientes pasos:
+   - Paso 3: Hardening SSH
+   - Paso 5: Instalar Tailscale VPN
+   - Más pasos automatizados...
 
-PASO C: En el menú selecciona la opción 3 para continuar."
+IMPORTANTE: Cierra la ventana de verificación Bitvise si la abriste.
+Vuelve a ESTA ventana (root) para continuar la instalación."
 echo ""
