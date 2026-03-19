@@ -53,45 +53,74 @@ source_config() {
 ask_initial_config() {
     print_header "Configuración Inicial"
 
-    log_info "Vamos a configurar VPSfacil para tu dominio y usuario."
-    log_info "Esta información se guardará y se usará en toda la instalación."
+    log_info "Antes de instalar necesitamos dos datos básicos:"
+    log_info "  1. Tu nombre de dominio (ej: miempresa.com)"
+    log_info "  2. El nombre del usuario administrador a crear en el servidor"
+    echo ""
+    log_info "Esta información se usará en toda la instalación."
+    echo ""
+    print_separator
     echo ""
 
     # --- Dominio ---
+    echo -e "${COLOR_BOLD_WHITE}PREGUNTA 1 de 3 — Dominio${COLOR_RESET}"
+    echo ""
+    log_info "Escribe el nombre de tu dominio principal."
+    log_info "Ejemplos: agentexperto.work  |  miempresa.com  |  startup.io"
+    echo ""
     while true; do
-        DOMAIN=$(prompt_input "Ingresa tu nombre de dominio" "example.com")
+        DOMAIN=$(prompt_input "¿Cuál es tu dominio?" "agentexperto.work")
         DOMAIN="${DOMAIN,,}"  # convertir a minúsculas
 
-        # Validar formato básico de dominio
-        if [[ "$DOMAIN" =~ ^[a-z0-9][a-z0-9.-]+\.[a-z]{2,}$ ]]; then
+        # Regex corregida: valida que haya al menos una parte + punto + TLD
+        if [[ "$DOMAIN" =~ ^([a-z0-9][a-z0-9-]*\.)+[a-z]{2,}$ ]]; then
             break
         else
-            log_warning "Formato de dominio inválido. Ejemplo válido: agentexperto.work"
+            log_warning "Formato inválido. Escribe solo el dominio, sin http ni www."
+            log_info    "Correcto:   agentexperto.work"
+            log_info    "Incorrecto: https://agentexperto.work  o  www.agentexperto.work"
         fi
     done
 
+    echo ""
+    print_separator
     echo ""
 
     # --- Usuario admin ---
+    echo -e "${COLOR_BOLD_WHITE}PREGUNTA 2 de 3 — Usuario administrador${COLOR_RESET}"
+    echo ""
+    log_info "Este usuario reemplazará a 'root' como administrador del servidor."
+    log_info "Con él te conectarás vía SSH después de la instalación."
+    log_info "Usa solo letras minúsculas, números y guión bajo (sin espacios)."
+    log_info "Ejemplos: jaime  |  admin  |  carlos_lopez"
+    echo ""
     while true; do
-        ADMIN_USER=$(prompt_input "Ingresa el nombre del usuario admin a crear" "admin")
+        ADMIN_USER=$(prompt_input "¿Qué nombre de usuario quieres crear?" "admin")
         ADMIN_USER="${ADMIN_USER,,}"  # convertir a minúsculas
 
-        # Validar: solo letras, números y guión bajo, sin espacios
-        if [[ "$ADMIN_USER" =~ ^[a-z][a-z0-9_]{2,31}$ ]]; then
+        if [[ "$ADMIN_USER" =~ ^[a-z][a-z0-9_]{1,31}$ ]]; then
             break
         else
-            log_warning "Nombre de usuario inválido."
-            log_info    "Usa solo letras minúsculas, números y guión bajo (mínimo 3 caracteres)"
+            log_warning "Nombre inválido. Solo letras minúsculas, números y guión bajo."
+            log_info    "Correcto:   jaime  |  admin  |  mi_usuario"
+            log_info    "Incorrecto: Mi Usuario  |  123admin  |  admin@host"
         fi
     done
 
     echo ""
+    print_separator
+    echo ""
 
     # --- Zona horaria ---
-    log_info "Zona horaria del servidor (afecta logs y backups)"
-    log_info "Ejemplos: America/Santiago, America/Bogota, America/Mexico_City, UTC"
-    TIMEZONE=$(prompt_input "Ingresa tu zona horaria" "America/Santiago")
+    echo -e "${COLOR_BOLD_WHITE}PREGUNTA 3 de 3 — Zona horaria${COLOR_RESET}"
+    echo ""
+    log_info "Define la zona horaria del servidor (afecta logs y backups)."
+    log_info "Ejemplos:"
+    log_info "  América: America/Santiago  |  America/Bogota  |  America/Mexico_City"
+    log_info "  Europa:  Europe/Madrid     |  Europe/London"
+    log_info "  Si no estás seguro, usa: UTC"
+    echo ""
+    TIMEZONE=$(prompt_input "¿Cuál es tu zona horaria?" "America/Santiago")
 
     echo ""
 
