@@ -130,9 +130,12 @@ progress_show() {
 
     local completed_steps=""
     if [[ -f "$PROGRESS_LOG" ]]; then
-        # Contar líneas completadas
-        completed_count=$(grep -c "STATUS=completado" "$PROGRESS_LOG" 2>/dev/null)
-        completed_count=${completed_count:-0}  # Default a 0 si está vacío
+        # Contar líneas completadas de forma segura
+        if grep -q "STATUS=completado" "$PROGRESS_LOG" 2>/dev/null; then
+            completed_count=$(grep "STATUS=completado" "$PROGRESS_LOG" 2>/dev/null | wc -l | tr -d ' ')
+        else
+            completed_count=0
+        fi
         # Obtener lista de pasos completados
         completed_steps=$(grep "STATUS=completado" "$PROGRESS_LOG" 2>/dev/null | cut -d'|' -f1 | sed 's/PASO=//' | tr '\n' ' ' 2>/dev/null || echo "")
     fi
