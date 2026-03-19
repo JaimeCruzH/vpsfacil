@@ -7,7 +7,7 @@
 #   1. Deshabilita login SSH con password (solo llaves)
 #   2. Deshabilita login SSH como root
 #   3. Instala y configura fail2ban (protección fuerza bruta)
-#   4. Opcionalmente cambia el puerto SSH
+#   4. Mantiene puerto 22 (el cambio de puerto va en el paso 4 con UFW)
 #
 # ADVERTENCIA CRÍTICA:
 #   Antes de ejecutar este script debes haber verificado que
@@ -136,52 +136,14 @@ set_ssh_option "AllowUsers" "${ADMIN_USER}"
 log_success "Configuraciones de seguridad aplicadas ✓"
 
 # ============================================================
-# 4. CAMBIO DE PUERTO SSH (opcional)
+# 4. PUERTO SSH
 # ============================================================
 log_step "Puerto SSH"
 
-PUERTO_ACTUAL=$(grep -E "^#?Port " "$SSHD_CONFIG" | head -1 | awk '{print $2}' || echo "22")
-PUERTO_ACTUAL="${PUERTO_ACTUAL:-22}"
-
-log_info "Puerto SSH actual: ${PUERTO_ACTUAL}"
-echo ""
-log_info "Cambiar el puerto SSH dificulta los ataques automatizados."
-log_info "Si cambias el puerto, recuerda configurarlo en Bitvise."
-log_info "Puerto recomendado: un número entre 1024 y 65535 (ej: 2222)"
-echo ""
-
-if confirm "¿Deseas cambiar el puerto SSH (actualmente: ${PUERTO_ACTUAL})?"; then
-    while true; do
-        NUEVO_PUERTO=$(prompt_input "Nuevo puerto SSH" "2222")
-        if [[ "$NUEVO_PUERTO" =~ ^[0-9]+$ ]] && \
-           [[ "$NUEVO_PUERTO" -ge 1024 ]] && \
-           [[ "$NUEVO_PUERTO" -le 65535 ]]; then
-            break
-        else
-            log_warning "Puerto inválido. Debe ser un número entre 1024 y 65535"
-        fi
-    done
-
-    set_ssh_option "Port" "$NUEVO_PUERTO"
-    SSH_PORT="$NUEVO_PUERTO"
-    log_success "Puerto SSH cambiado a: ${NUEVO_PUERTO} ✓"
-
-    windows_instruction "ACTUALIZAR PUERTO SSH EN BITVISE
-
-Debes actualizar el puerto en Bitvise SSH Client:
-
-1. Abre Bitvise SSH Client
-2. En el campo 'Port' cambia 22 por: ${NUEVO_PUERTO}
-3. Haz clic en 'Save profile'
-
-IMPORTANTE: La próxima vez que te conectes, usa el puerto ${NUEVO_PUERTO}
-Si no lo cambias, no podrás conectarte."
-
-    wait_for_user "Presiona Enter cuando hayas anotado el nuevo puerto..."
-else
-    SSH_PORT="22"
-    log_info "Puerto SSH mantenido en: 22"
-fi
+SSH_PORT="22"
+log_info "Puerto SSH mantenido en: 22"
+log_info "El cambio de puerto se realizará en el paso 4 (Firewall),"
+log_info "donde UFW podrá abrir el nuevo puerto de forma segura."
 
 # ============================================================
 # 5. INSTALAR Y CONFIGURAR FAIL2BAN
