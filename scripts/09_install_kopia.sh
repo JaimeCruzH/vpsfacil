@@ -61,26 +61,43 @@ chmod -R 755 "$APP_DIR"
 log_success "Directorios creados ✓"
 
 # ============================================================
+# MODO AUTOMÁTICO: Detectar si las credenciales vienen del entorno
+# ============================================================
+KOPIA_PASS="${KOPIA_PASS:-}"
+AUTOMATIC_MODE=false
+
+if [[ -n "$KOPIA_PASS" ]]; then
+    AUTOMATIC_MODE=true
+    log_info "Modo automático: usando contraseña del instalador"
+fi
+
+# ============================================================
 # 2. CONFIGURAR CONTRASEÑA DE KOPIA
 # ============================================================
 log_step "Configurando contraseña de Kopia"
 
-log_info "Kopia necesita una contraseña para cifrar los backups."
-log_warning "Guarda esta contraseña en un lugar seguro."
-log_warning "Sin ella NO podrás restaurar tus backups."
-echo ""
+if [[ "$AUTOMATIC_MODE" == "false" ]]; then
+    # Modo interactivo: pedir contraseña al usuario
+    log_info "Kopia necesita una contraseña para cifrar los backups."
+    log_warning "Guarda esta contraseña en un lugar seguro."
+    log_warning "Sin ella NO podrás restaurar tus backups."
+    echo ""
 
-while true; do
-    KOPIA_PASS=$(prompt_password "Contraseña para cifrar backups de Kopia")
-    KOPIA_PASS2=$(prompt_password "Confirma la contraseña")
-    if [[ "$KOPIA_PASS" == "$KOPIA_PASS2" && ${#KOPIA_PASS} -ge 8 ]]; then
-        break
-    elif [[ "$KOPIA_PASS" != "$KOPIA_PASS2" ]]; then
-        log_warning "Las contraseñas no coinciden. Intenta de nuevo."
-    else
-        log_warning "La contraseña debe tener al menos 8 caracteres."
-    fi
-done
+    while true; do
+        KOPIA_PASS=$(prompt_password "Contraseña para cifrar backups de Kopia")
+        KOPIA_PASS2=$(prompt_password "Confirma la contraseña")
+        if [[ "$KOPIA_PASS" == "$KOPIA_PASS2" && ${#KOPIA_PASS} -ge 8 ]]; then
+            break
+        elif [[ "$KOPIA_PASS" != "$KOPIA_PASS2" ]]; then
+            log_warning "Las contraseñas no coinciden. Intenta de nuevo."
+        else
+            log_warning "La contraseña debe tener al menos 8 caracteres."
+        fi
+    done
+else
+    # Modo automático: contraseña ya está definida
+    echo ""
+fi
 
 # Contraseña para la interfaz web de Kopia
 KOPIA_WEB_USER="admin"

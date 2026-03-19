@@ -27,10 +27,11 @@ if [[ "$SCRIPT_DIR" == "" || "$SCRIPT_DIR" == "/dev/fd" || "$SCRIPT_DIR" == "/pr
     REPO_RAW="https://raw.githubusercontent.com/JaimeCruzH/vpsfacil/main"
     TMP_LIB="/tmp/vpsfacil_lib"
     mkdir -p "$TMP_LIB"
-    curl -sSL "${REPO_RAW}/lib/colors.sh"  -o "${TMP_LIB}/colors.sh"
-    curl -sSL "${REPO_RAW}/lib/config.sh"  -o "${TMP_LIB}/config.sh"
-    curl -sSL "${REPO_RAW}/lib/utils.sh"   -o "${TMP_LIB}/utils.sh"
-    curl -sSL "${REPO_RAW}/lib/menu.sh"    -o "${TMP_LIB}/menu.sh"
+    curl -sSL "${REPO_RAW}/lib/colors.sh"            -o "${TMP_LIB}/colors.sh"
+    curl -sSL "${REPO_RAW}/lib/config.sh"            -o "${TMP_LIB}/config.sh"
+    curl -sSL "${REPO_RAW}/lib/utils.sh"             -o "${TMP_LIB}/utils.sh"
+    curl -sSL "${REPO_RAW}/lib/menu.sh"              -o "${TMP_LIB}/menu.sh"
+    curl -sSL "${REPO_RAW}/lib/install_prompts.sh"   -o "${TMP_LIB}/install_prompts.sh"
     LIB_DIR="$TMP_LIB"
     REMOTE_INSTALL=true
 else
@@ -44,6 +45,8 @@ source "${LIB_DIR}/colors.sh"
 source "${LIB_DIR}/config.sh"
 # shellcheck source=lib/utils.sh
 source "${LIB_DIR}/utils.sh"
+# shellcheck source=lib/install_prompts.sh
+source "${LIB_DIR}/install_prompts.sh"
 
 # ============================================================
 # VERIFICACIÓN INICIAL
@@ -219,44 +222,77 @@ while true; do
         12) run_script "apps/n8n.sh" ;;
         13) run_script "apps/openclaw.sh" ;;
 
-        A)  # Instalación completa automática
-            print_header "Instalación Completa Automática"
-            log_warning "Esto instalará todos los componentes core en orden (1-11)."
-            log_info    "Las aplicaciones opcionales se preguntarán al finalizar."
+        A)  # Instalación completa automática (FASE A + FASE B)
+            print_header "Instalación Automática - FASE A"
+            log_warning "Se instalarán todos los componentes core en 2 fases:"
+            log_info    "  FASE A (ahora):     Pasos 1-3 + Tailscale (como root)"
+            log_info    "  FASE B (después):   Pasos 4, 6-11 (como usuario admin)"
             echo ""
-            if confirm "¿Iniciar instalación completa?"; then
-                for script in \
-                    "scripts/00_precheck.sh" \
-                    "scripts/01_create_user.sh" \
-                    "scripts/02_secure_ssh.sh" \
-                    "scripts/03_install_firewall.sh" \
-                    "scripts/04_install_docker.sh" \
-                    "scripts/05_install_tailscale.sh" \
-                    "scripts/06_setup_certificates.sh" \
-                    "scripts/07_setup_dns.sh" \
-                    "scripts/08_install_portainer.sh" \
-                    "scripts/09_install_kopia.sh" \
-                    "scripts/10_install_filebrowser.sh"
-                do
-                    run_script "$script"
-                done
+            if confirm "¿Iniciar instalación automática?"; then
 
-                print_header "Instalación Core Completada"
-                log_success "¡Todos los componentes core instalados correctamente!"
-                echo ""
-                log_info "¿Deseas instalar aplicaciones opcionales?"
-                echo ""
-                confirm "¿Instalar N8N?"      && run_script "apps/n8n.sh"
-                confirm "¿Instalar OpenClaw?" && run_script "apps/openclaw.sh"
+                # ============================================================
+                # FASE A: Recolectar inputs y ejecutar pasos 1-3, 5
+                # ============================================================
 
-                print_header "¡Instalación Finalizada!"
-                log_success "Tu VPS está configurado y listo para usar."
+                # 1. Recolectar TODOS los inputs upfront
+                collect_all_inputs
+
                 echo ""
-                log_info "URLs de acceso (requieren Tailscale VPN activo):"
-                echo -e "   Portainer:    ${COLOR_CYAN}${URL_PORTAINER}${COLOR_RESET}"
-                echo -e "   Kopia Backup: ${COLOR_CYAN}${URL_KOPIA}${COLOR_RESET}"
+                log_step "FASE A: Instalación Inicial (como root)"
                 echo ""
-                log_info "Para más información, ejecuta la opción I del menú."
+
+                # 2. Ejecutar pasos 1-3 (como root)
+                log_process "Paso 1: Pre-verificaciones..."
+                run_script "scripts/00_precheck.sh" || {
+                    log_error "Paso 1 falló. Abortando."
+                    exit 1
+                }
+
+                log_process "Paso 2: Crear usuario admin..."
+                run_script "scripts/01_create_user.sh" || {
+                    log_error "Paso 2 falló. Abortando."
+                    exit 1
+                }
+
+                log_process "Paso 3: Seguridad SSH..."
+                run_script "scripts/02_secure_ssh.sh" || {
+                    log_error "Paso 3 falló. Abortando."
+                    exit 1
+                }
+
+                # 3. Ejecutar paso 5 (Tailscale - necesita usuario creado)
+                log_process "Paso 5: Instalar y configurar Tailscale..."
+                run_script "scripts/05_install_tailscale.sh" || {
+                    log_error "Paso 5 falló. Abortando."
+                    exit 1
+                }
+
+                # ============================================================
+                # INSTRUCCIONES PARA FASE B
+                # ============================================================
+                echo ""
+                echo ""
+                print_separator
+                echo ""
+                log_success "¡FASE A Completada!"
+                echo ""
+                echo -e "  ${COLOR_BOLD_WHITE}Próximo paso:${COLOR_RESET}"
+                echo -e "  Reconéctate al VPS como usuario ${COLOR_CYAN}${ADMIN_USER}${COLOR_RESET}:"
+                echo ""
+                echo -e "    ${COLOR_BOLD_GREEN}ssh ${ADMIN_USER}@TU_VPS_IP${COLOR_RESET}"
+                echo ""
+                echo -e "  Luego navega al directorio del proyecto y ejecuta:"
+                echo ""
+                echo -e "    ${COLOR_BOLD_GREEN}cd ~/vpsfacil${COLOR_RESET}"
+                echo -e "    ${COLOR_BOLD_GREEN}bash scripts/install_core.sh${COLOR_RESET}"
+                echo ""
+                echo -e "  Esto ejecutará los pasos 4, 6-11 sin interrupciones:"
+                echo -e "  (Firewall, Docker, Certificados, DNS, Portainer, Kopia, File Browser)"
+                echo ""
+                log_info "Tiempo estimado FASE B: 15-20 minutos"
+                echo ""
+                print_separator
+                echo ""
             fi
             wait_for_user
             ;;

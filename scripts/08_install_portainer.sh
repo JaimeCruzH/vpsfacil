@@ -50,6 +50,20 @@ if [[ ! -f "${CERT_FILE}" || ! -f "${CERT_KEY}" ]]; then
 fi
 
 # ============================================================
+# MODO AUTOMÁTICO: Detectar si las credenciales vienen del entorno
+# ============================================================
+# Si PORTAINER_ADMIN y PORTAINER_PASS están definidas (desde install_core.sh),
+# usar esas sin preguntar. Si no, usar valores por defecto y pedir.
+PORTAINER_ADMIN="${PORTAINER_ADMIN:-}"
+PORTAINER_PASS="${PORTAINER_PASS:-}"
+AUTOMATIC_MODE=false
+
+if [[ -n "$PORTAINER_ADMIN" && -n "$PORTAINER_PASS" ]]; then
+    AUTOMATIC_MODE=true
+    log_info "Modo automático: usando credenciales del instalador"
+fi
+
+# ============================================================
 # DETECCIÓN: ¿PORTAINER YA ESTÁ INSTALADO?
 # ============================================================
 APP_DIR="${APPS_DIR}/portainer"
@@ -198,22 +212,30 @@ log_success "Portainer está corriendo ✓"
 # ============================================================
 log_step "Configurando cuenta de administrador de Portainer"
 
-log_info "Crea las credenciales para acceder a Portainer:"
-echo ""
+if [[ "$AUTOMATIC_MODE" == "false" ]]; then
+    # Modo interactivo: pedir credenciales al usuario
+    log_info "Crea las credenciales para acceder a Portainer:"
+    echo ""
 
-PORTAINER_ADMIN=$(prompt_input "Nombre de usuario administrador" "admin")
+    PORTAINER_ADMIN=$(prompt_input "Nombre de usuario administrador" "admin")
 
-while true; do
-    PORTAINER_ADMIN_PASS=$(prompt_password "Contraseña (mínimo 12 caracteres)")
-    PORTAINER_ADMIN_PASS2=$(prompt_password "Confirma la contraseña")
-    if [[ "$PORTAINER_ADMIN_PASS" == "$PORTAINER_ADMIN_PASS2" && ${#PORTAINER_ADMIN_PASS} -ge 12 ]]; then
-        break
-    elif [[ "$PORTAINER_ADMIN_PASS" != "$PORTAINER_ADMIN_PASS2" ]]; then
-        log_warning "Las contraseñas no coinciden."
-    else
-        log_warning "Mínimo 12 caracteres."
-    fi
-done
+    while true; do
+        PORTAINER_ADMIN_PASS=$(prompt_password "Contraseña (mínimo 12 caracteres)")
+        PORTAINER_ADMIN_PASS2=$(prompt_password "Confirma la contraseña")
+        if [[ "$PORTAINER_ADMIN_PASS" == "$PORTAINER_ADMIN_PASS2" && ${#PORTAINER_ADMIN_PASS} -ge 12 ]]; then
+            break
+        elif [[ "$PORTAINER_ADMIN_PASS" != "$PORTAINER_ADMIN_PASS2" ]]; then
+            log_warning "Las contraseñas no coinciden."
+        else
+            log_warning "Mínimo 12 caracteres."
+        fi
+    done
+else
+    # Modo automático: usar credenciales del instalador
+    echo ""
+    log_info "Usando credenciales del instalador automático"
+    PORTAINER_ADMIN_PASS="$PORTAINER_PASS"
+fi
 
 log_process "Inicializando cuenta en Portainer (esperando que la API esté lista)..."
 sleep 5
