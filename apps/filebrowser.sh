@@ -179,19 +179,65 @@ wait_for_port "localhost" "${PORT_FILEBROWSER}" 60
 log_success "File Browser está corriendo ✓"
 
 # ============================================================
-# 7. CONFIGURAR USUARIO ADMIN EN FILE BROWSER
+# 7. CONFIGURAR USUARIO ADMIN VÍA API
 # ============================================================
 log_step "Configurando usuario administrador"
 
-sleep 5
+log_process "Esperando que File Browser esté completamente listo (10s)..."
+sleep 10
 
-# Usar la CLI de File Browser para crear/actualizar usuario admin
-docker exec filebrowser filebrowser users add \
-    "${FB_USER}" "${FB_PASS}" \
-    --perm.admin \
-    --config /config/filebrowser.json 2>/dev/null && \
-    log_success "Usuario '${FB_USER}' creado ✓" || \
-    log_info "Usuario se puede configurar desde la interfaz web"
+# File Browser arranca con usuario por defecto: admin / admin
+# Usamos la API para renombrar ese usuario y cambiar su contraseña
+log_process "Autenticando con credenciales por defecto (admin/admin)..."
+
+FB_TOKEN=$(curl -sk -X POST "https://localhost:${PORT_FILEBROWSER}/api/login" \
+    -H "Content-Type: application/json" \
+    -d '{"username":"admin","password":"admin","recaptcha":""}' 2>/dev/null | \
+    jq -r '.token // ""' 2>/dev/null)
+
+if [[ -n "$FB_TOKEN" ]]; then
+    # Obtener ID del usuario admin (normalmente es 1)
+    ADMIN_ID=$(curl -sk -X GET "https://localhost:${PORT_FILEBROWSER}/api/users" \
+        -H "X-Auth: ${FB_TOKEN}" 2>/dev/null | \
+        jq -r '.[0].id // 1' 2>/dev/null)
+
+    # Actualizar usuario: cambiar nombre y contraseña
+    UPDATE_BODY=$(jq -n \
+        --argjson id "$ADMIN_ID" \
+        --arg u  "$FB_USER" \
+        --arg p  "$FB_PASS" \
+        '{
+            id: $id,
+            username: $u,
+            password: $p,
+            locale: "es",
+            hideDotfiles: false,
+            dateFormat: false,
+            perm: {
+                admin: true, execute: true, create: true,
+                rename: true, modify: true, delete: true,
+                share: true, download: true
+            }
+        }')
+
+    HTTP_STATUS=$(curl -sk -o /dev/null -w "%{http_code}" \
+        -X PUT "https://localhost:${PORT_FILEBROWSER}/api/users/${ADMIN_ID}" \
+        -H "X-Auth: ${FB_TOKEN}" \
+        -H "Content-Type: application/json" \
+        -d "$UPDATE_BODY" 2>/dev/null)
+
+    if [[ "$HTTP_STATUS" == "200" ]]; then
+        log_success "Usuario '${FB_USER}' configurado correctamente ✓"
+    else
+        log_warning "No se pudo actualizar el usuario (HTTP ${HTTP_STATUS})."
+        log_info    "Accede a ${URL_FILEBROWSER} con: admin / admin"
+        log_info    "Luego cambia las credenciales en Settings → User Management"
+    fi
+else
+    log_warning "No se pudo autenticar con File Browser."
+    log_info    "Es posible que las credenciales por defecto ya hayan cambiado."
+    log_info    "Accede a ${URL_FILEBROWSER} y usa: admin / admin"
+fi
 
 # ============================================================
 # INSTRUCCIONES
