@@ -50,9 +50,8 @@ if docker ps -aq --filter "name=filebrowser" 2>/dev/null | grep -q .; then
 fi
 
 # Eliminar base de datos para que arranque con admin/admin
-# (el archivo vive dentro del directorio db/, no como bind-mount de archivo)
-if [[ -f "${APP_DIR}/db/filebrowser.db" ]]; then
-    rm -f "${APP_DIR}/db/filebrowser.db"
+if [[ -f "${APP_DIR}/filebrowser.db" ]]; then
+    rm -f "${APP_DIR}/filebrowser.db"
     log_success "Base de datos limpiada ✓"
 fi
 
@@ -61,20 +60,21 @@ fi
 # ============================================================
 log_step "Creando estructura de directorios"
 
-mkdir -p "${APP_DIR}/db"
 mkdir -p "${APP_DIR}/data"
 chown -R "${ADMIN_USER}:${ADMIN_USER}" "$APP_DIR"
 log_success "Directorio: ${APP_DIR} ✓"
+
+# Pre-crear el archivo de base de datos vacío antes del bind-mount.
+# La imagen oficial tiene /database/ creado internamente; montar el archivo
+# ahí funciona correctamente y File Browser inicializa admin/admin.
+touch "${APP_DIR}/filebrowser.db"
+chown "${ADMIN_USER}:${ADMIN_USER}" "${APP_DIR}/filebrowser.db"
 
 # ============================================================
 # 3. PREPARAR Y DESPLEGAR VÍA PORTAINER
 # ============================================================
 log_step "Generando docker-compose.yml"
 
-# La base de datos se monta como directorio (db/ → /db) y File Browser
-# crea el archivo /db/filebrowser.db desde cero con admin/admin por defecto.
-# Esto es crítico: montar un archivo vacío como bind-mount hace que BoltDB
-# falle silenciosamente sin crear el usuario admin.
 COMPOSE_CONTENT=$(cat << EOF
 # ============================================================
 # File Browser — VPSfacil
@@ -92,17 +92,13 @@ services:
     environment:
       TZ: ${TIMEZONE}
     ports:
-      - "${PORT_FILEBROWSER}:8080"
+      - "${PORT_FILEBROWSER}:80"
     volumes:
-      - ${APP_DIR}/db:/db
+      - ${APP_DIR}/filebrowser.db:/database/filebrowser.db
       - ${APP_DIR}/data:/srv/local
       - ${APPS_DIR}:/srv/apps
       - ${ADMIN_HOME}:/srv/home:ro
-    command: >
-      --database /db/filebrowser.db
-      --root /srv
-      --address 0.0.0.0
-      --port 8080
+    command: --root /srv
     networks:
       - vpsfacil-net
 
