@@ -50,11 +50,77 @@ if [[ ! -f "${CERT_FILE}" || ! -f "${CERT_KEY}" ]]; then
 fi
 
 # ============================================================
+# DETECCIÓN: ¿PORTAINER YA ESTÁ INSTALADO?
+# ============================================================
+APP_DIR="${APPS_DIR}/portainer"
+_PORTAINER_EXISTS=false
+
+if docker ps -q --filter "name=portainer" 2>/dev/null | grep -q .; then
+    _PORTAINER_EXISTS=true
+    log_warning "Portainer ya está instalado y corriendo."
+    echo ""
+    log_info "Tienes dos opciones:"
+    log_info "  1) Reinstalar desde cero (elimina datos de Portainer)"
+    log_info "  2) Solo guardar credenciales de la cuenta existente"
+    echo ""
+    REINSTALL_OPT=$(prompt_input "¿Qué deseas hacer? (1 o 2)" "2")
+    REINSTALL_OPT="${REINSTALL_OPT//[^12]/}"
+    REINSTALL_OPT="${REINSTALL_OPT:-2}"
+
+    if [[ "$REINSTALL_OPT" == "1" ]]; then
+        log_warning "Se eliminarán todos los stacks y configuración de Portainer."
+        if confirm "¿Confirmas la reinstalación completa?"; then
+            log_process "Deteniendo y eliminando Portainer..."
+            cd "$APP_DIR" 2>/dev/null || true
+            docker compose down 2>/dev/null || docker stop portainer 2>/dev/null || true
+            docker rm portainer 2>/dev/null || true
+            rm -rf "${APP_DIR}/data"
+            mkdir -p "${APP_DIR}/data"
+            chown -R "${ADMIN_USER}:${ADMIN_USER}" "${APP_DIR}/data"
+            log_success "Portainer eliminado — reinstalando desde cero ✓"
+            _PORTAINER_EXISTS=false
+        else
+            log_info "Cancelado. Solo se guardarán las credenciales."
+            REINSTALL_OPT="2"
+        fi
+    fi
+
+    if [[ "$REINSTALL_OPT" == "2" ]]; then
+        log_info "Ingresa las credenciales del administrador existente en Portainer:"
+        echo ""
+        PORTAINER_ADMIN=$(prompt_input "Nombre de usuario administrador" "admin")
+        while true; do
+            PORTAINER_ADMIN_PASS=$(prompt_password "Contraseña")
+            # Verificar credenciales intentando hacer login
+            log_process "Verificando credenciales..."
+            LOGIN_TEST=$(curl -sk -X POST "${PORTAINER_URL}/api/auth" \
+                -H "Content-Type: application/json" \
+                -d "$(jq -n --arg u "$PORTAINER_ADMIN" --arg p "$PORTAINER_ADMIN_PASS" '{username:$u,password:$p}')" 2>/dev/null)
+            if echo "$LOGIN_TEST" | jq -e '.jwt' > /dev/null 2>&1; then
+                log_success "Credenciales correctas ✓"
+                break
+            else
+                log_warning "Credenciales incorrectas. Intenta de nuevo."
+            fi
+        done
+        portainer_save_creds "$PORTAINER_ADMIN" "$PORTAINER_ADMIN_PASS"
+        log_success "Credenciales guardadas → las apps usarán Portainer automáticamente ✓"
+        echo ""
+        print_separator
+        echo ""
+        log_success "Configuración completada"
+        echo -e "    URL:          ${COLOR_CYAN}${URL_PORTAINER}${COLOR_RESET}"
+        echo -e "    Usuario:      ${COLOR_CYAN}${PORTAINER_ADMIN}${COLOR_RESET}"
+        echo ""
+        exit 0
+    fi
+fi
+
+# ============================================================
 # 1. CREAR ESTRUCTURA DE DIRECTORIOS
 # ============================================================
 log_step "Creando estructura de directorios"
 
-APP_DIR="${APPS_DIR}/portainer"
 mkdir -p "${APP_DIR}/data"
 chown -R "${ADMIN_USER}:${ADMIN_USER}" "$APP_DIR"
 chmod -R 755 "$APP_DIR"
@@ -157,8 +223,8 @@ if echo "$INIT_RESP" | jq -e '.Id' > /dev/null 2>&1; then
     log_success "Cuenta '${PORTAINER_ADMIN}' creada en Portainer ✓"
 else
     INIT_MSG=$(echo "$INIT_RESP" | jq -r '.message // "sin detalles"' 2>/dev/null)
-    log_warning "Respuesta de Portainer: ${INIT_MSG}"
-    log_info   "Si la cuenta ya existía, usa las credenciales que configuraste."
+    log_warning "No se pudo crear la cuenta: ${INIT_MSG}"
+    log_info    "Verifica las credenciales manualmente en ${URL_PORTAINER}"
 fi
 
 # Guardar credenciales para uso automático por todas las apps
