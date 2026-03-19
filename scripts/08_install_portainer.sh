@@ -59,15 +59,16 @@ if docker ps -q --filter "name=portainer" 2>/dev/null | grep -q .; then
     _PORTAINER_EXISTS=true
     log_warning "Portainer ya está instalado y corriendo."
     echo ""
-    log_info "Tienes dos opciones:"
-    log_info "  1) Reinstalar desde cero (elimina datos de Portainer)"
+    log_info "Tienes tres opciones:"
+    log_info "  1) Actualizar configuración SSL (sin pérdida de datos) ← RECOMENDADO"
     log_info "  2) Solo guardar credenciales de la cuenta existente"
+    log_info "  3) Reinstalar desde cero (elimina TODOS los datos de Portainer)"
     echo ""
-    REINSTALL_OPT=$(prompt_input "¿Qué deseas hacer? (1 o 2)" "2")
-    REINSTALL_OPT="${REINSTALL_OPT//[^12]/}"
-    REINSTALL_OPT="${REINSTALL_OPT:-2}"
+    REINSTALL_OPT=$(prompt_input "¿Qué deseas hacer? (1, 2 o 3)" "1")
+    REINSTALL_OPT="${REINSTALL_OPT//[^123]/}"
+    REINSTALL_OPT="${REINSTALL_OPT:-1}"
 
-    if [[ "$REINSTALL_OPT" == "1" ]]; then
+    if [[ "$REINSTALL_OPT" == "3" ]]; then
         log_warning "Se eliminarán todos los stacks y configuración de Portainer."
         if confirm "¿Confirmas la reinstalación completa?"; then
             log_process "Deteniendo y eliminando Portainer..."
@@ -80,9 +81,18 @@ if docker ps -q --filter "name=portainer" 2>/dev/null | grep -q .; then
             log_success "Portainer eliminado — reinstalando desde cero ✓"
             _PORTAINER_EXISTS=false
         else
-            log_info "Cancelado. Solo se guardarán las credenciales."
-            REINSTALL_OPT="2"
+            log_info "Cancelado. Cambiando a opción 1 (actualizar configuración)."
+            REINSTALL_OPT="1"
         fi
+    fi
+
+    if [[ "$REINSTALL_OPT" == "1" ]]; then
+        log_process "Deteniendo Portainer para actualizar configuración SSL..."
+        cd "$APP_DIR" 2>/dev/null || true
+        docker compose down 2>/dev/null || docker stop portainer 2>/dev/null || true
+        docker rm portainer 2>/dev/null || true
+        log_success "Contenedor detenido (datos conservados) ✓"
+        _PORTAINER_EXISTS=false  # Forzar recreación del contenedor
     fi
 
     if [[ "$REINSTALL_OPT" == "2" ]]; then
@@ -91,7 +101,6 @@ if docker ps -q --filter "name=portainer" 2>/dev/null | grep -q .; then
         PORTAINER_ADMIN=$(prompt_input "Nombre de usuario administrador" "admin")
         while true; do
             PORTAINER_ADMIN_PASS=$(prompt_password "Contraseña")
-            # Verificar credenciales intentando hacer login
             log_process "Verificando credenciales..."
             LOGIN_TEST=$(curl -sk -X POST "${PORTAINER_URL}/api/auth" \
                 -H "Content-Type: application/json" \
@@ -155,9 +164,8 @@ services:
       - ${CERT_FILE}:/certs/cert.pem:ro
       - ${CERT_KEY}:/certs/key.pem:ro
     command: >
-      --tlsverify
-      --tlscert /certs/cert.pem
-      --tlskey /certs/key.pem
+      --sslcert /certs/cert.pem
+      --sslkey /certs/key.pem
     networks:
       - vpsfacil-net
 
