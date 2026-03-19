@@ -672,6 +672,27 @@ EOF
 }
 
 # ============================================================
+# FUNCIÓN: Ejecutar un script de instalación (local o remoto)
+# ============================================================
+run_phase_script() {
+    local script_name="$1"
+    local script_path
+
+    if [[ -n "${SCRIPT_DIR}" && "${SCRIPT_DIR}" != "" ]]; then
+        # Ejecución local — usar script del repo
+        script_path="${SCRIPT_DIR}/scripts/${script_name}"
+        if [[ ! -f "$script_path" ]]; then
+            log_error "Script no encontrado: $script_path"
+            return 1
+        fi
+        bash "$script_path"
+    else
+        # Ejecución remota — descargar desde GitHub
+        bash <(curl -sSL "${REPO_RAW}/scripts/${script_name}?v=$(date +%s)")
+    fi
+}
+
+# ============================================================
 # HABILITAR STRICT MODE AHORA QUE LAS LIBRERÍAS ESTÁN CARGADAS
 # ============================================================
 set -euo pipefail
@@ -689,8 +710,8 @@ echo ""
 print_header "FASE A - Preparación (setup.sh)"
 echo ""
 
-log_info "Sistema de instalación VPSfacil"
-log_info "Ejecución: FASE A (como root)"
+log_success "Sistema de instalación VPSfacil"
+log_success "Ejecución: FASE A (como root)"
 echo ""
 
 # Verificación inicial
@@ -699,13 +720,34 @@ check_debian12
 check_internet
 
 echo ""
-log_info "Procediendo con la instalación..."
+log_success "Procediendo con FASE A..."
 echo ""
 
 # Pedir configuración inicial
 ask_initial_config
 
-# Si usuario eligió opción automática, recolectar todos los inputs
+# Ejecutar PASO 1: precheck
+echo ""
+log_step "Paso 1 - Verificaciones previas"
+run_phase_script "00_precheck.sh" || { log_error "Paso 1 falló"; exit 1; }
+
+# Ejecutar PASO 2: crear usuario
+echo ""
+log_step "Paso 2 - Crear usuario administrador"
+run_phase_script "01_create_user.sh" || { log_error "Paso 2 falló"; exit 1; }
+
+# Ejecutar PASO 3: secure SSH
+echo ""
+log_step "Paso 3 - Hardening SSH"
+run_phase_script "02_secure_ssh.sh" || { log_error "Paso 3 falló"; exit 1; }
+
+# Ejecutar PASO 5: Tailscale
+echo ""
+log_step "Paso 5 - Instalar Tailscale VPN"
+run_phase_script "05_install_tailscale.sh" || { log_error "Paso 5 falló"; exit 1; }
+
+# Recolectar credenciales Portainer y Kopia
+echo ""
 log_step "Recolectando datos para instalación automática"
 echo ""
 collect_all_inputs
@@ -713,18 +755,18 @@ collect_all_inputs
 echo ""
 print_separator
 echo ""
-log_success "FASE A completada"
+log_success "✓ FASE A completada exitosamente"
 echo ""
-log_info "Próximo paso:"
-log_info "1. Reconéctate a tu VPS como usuario admin vía Bitvise SSH:"
+log_success "Próximo paso:"
+log_success "1. Reconéctate a tu VPS como usuario admin vía Bitvise SSH:"
 echo ""
 echo -e "   ${COLOR_CYAN}ssh ${ADMIN_USER}@<TU_IP_VPS>${COLOR_RESET}"
 echo ""
-log_info "2. Ejecuta:"
+log_success "2. Ejecuta:"
 echo ""
 echo -e "   ${COLOR_CYAN}bash ~/install_core.sh${COLOR_RESET}"
 echo ""
-log_info "Para descargar e instalar_core.sh, usa:"
+log_success "Para descargar install_core.sh, usa:"
 echo ""
 echo -e "   ${COLOR_CYAN}curl -sSL \"${REPO_RAW}/scripts/install_core.sh?v=\$(date +%s)\" > ~/install_core.sh && bash ~/install_core.sh${COLOR_RESET}"
 echo ""
