@@ -26,8 +26,7 @@ echo ""
 # 1. Esperar que terminen procesos apt automáticos (common on fresh VPS)
 wait_apt() {
     local locks=("/var/lib/dpkg/lock-frontend" "/var/lib/dpkg/lock" "/var/cache/apt/archives/lock")
-    local waited=0
-    local shown=0
+    local waited=0 shown=0
 
     while true; do
         local busy=false
@@ -37,8 +36,9 @@ wait_apt() {
                 break
             fi
         done
-        [[ "$busy" == "false" ]] && break
-
+        if [[ "$busy" == "false" ]]; then
+            break
+        fi
         if [[ $shown -eq 0 ]]; then
             echo -e "\033[1;33m[⚠]\033[0m El sistema está ejecutando actualizaciones automáticas."
             echo -e "\033[1;34m[→]\033[0m Esperando que terminen (puede tardar 1-2 minutos)..."
@@ -47,7 +47,6 @@ wait_apt() {
         printf "."
         sleep 3
         waited=$((waited + 3))
-
         if [[ $waited -ge 300 ]]; then
             echo ""
             echo -e "\033[1;31m[✗]\033[0m Timeout esperando apt. Intenta ejecutar:"
@@ -55,7 +54,9 @@ wait_apt() {
             exit 1
         fi
     done
-    [[ $shown -eq 1 ]] && echo -e "\n\033[1;32m[✓]\033[0m Sistema libre, continuando..."
+    if [[ $shown -eq 1 ]]; then
+        echo -e "\n\033[1;32m[✓]\033[0m Sistema libre, continuando..."
+    fi
 }
 
 wait_apt

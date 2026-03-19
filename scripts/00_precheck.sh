@@ -163,9 +163,14 @@ _wait_apt_lock() {
     while true; do
         local busy=false
         for lock in "${locks[@]}"; do
-            fuser "$lock" >/dev/null 2>&1 && busy=true && break
+            if fuser "$lock" >/dev/null 2>&1; then
+                busy=true
+                break
+            fi
         done
-        [[ "$busy" == "false" ]] && break
+        if [[ "$busy" == "false" ]]; then
+            break
+        fi
         if [[ $shown -eq 0 ]]; then
             log_warning "Sistema ejecutando actualizaciones automáticas, esperando..."
             shown=1
@@ -173,9 +178,16 @@ _wait_apt_lock() {
         printf "."
         sleep 3
         waited=$((waited + 3))
-        [[ $waited -ge 300 ]] && echo "" && log_error "Timeout esperando apt lock" && exit 1
+        if [[ $waited -ge 300 ]]; then
+            echo ""
+            log_error "Timeout esperando apt lock"
+            exit 1
+        fi
     done
-    [[ $shown -eq 1 ]] && echo "" && log_success "Sistema libre ✓"
+    if [[ $shown -eq 1 ]]; then
+        echo ""
+        log_success "Sistema libre ✓"
+    fi
 }
 _wait_apt_lock
 
