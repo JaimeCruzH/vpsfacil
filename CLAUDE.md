@@ -28,9 +28,9 @@
 
 ---
 
-## Arquitectura de Red: Cloudflare DNS + Tailscale VPN + Cloudflare Origin Certificates
+## Arquitectura de Red: Cloudflare DNS + Tailscale VPN + Let's Encrypt (DNS-01)
 
-**Diseño de máxima seguridad:** Todas las aplicaciones accesibles ÚNICAMENTE vía Tailscale VPN, con URLs HTTPS amigables mediante Cloudflare Origin Certificates.
+**Diseño de máxima seguridad:** Todas las aplicaciones accesibles ÚNICAMENTE vía Tailscale VPN, con URLs HTTPS amigables mediante Let's Encrypt con Cloudflare DNS-01 challenge.
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
@@ -49,8 +49,8 @@
         ↓ Túnel VPN Tailscale + cifrado SSL/TLS
 ┌──────────────────────────────────────────────────────────────┐
 │ VPS (IP Tailscale: 100.91.x.x)                               │
-│ ├─ Cloudflare Origin Certificate                             │
-│ │  └─ *.vpn.agentexperto.work (validez 15 años)              │
+│ ├─ Let's Encrypt (wildcard)                             │
+│ │  └─ *.vpn.agentexperto.work (renovación automática cada 60 días)              │
 │ ├─ N8N          (puerto 5678, solo Tailscale IP)             │
 │ ├─ File Browser (puerto 8080, solo Tailscale IP)             │
 │ ├─ OpenClaw     (puerto 18789, solo Tailscale IP)            │
@@ -63,7 +63,7 @@
 - ✅ Cero exposición a internet (100% privado)
 - ✅ Sin vulnerabilidad a DDoS
 - ✅ URLs HTTPS con nombres DNS amigables y profesionales
-- ✅ Certificados SSL válidos (Cloudflare Origin, 15 años de validez)
+- ✅ Certificados SSL válidos (Let's Encrypt, renovación automática)
 - ✅ Sin Nginx Proxy Manager (menos componentes, menos mantenimiento)
 - ✅ Sin Let's Encrypt (sin renovaciones cada 90 días)
 - ✅ Doble cifrado (SSL/TLS + VPN Tailscale)
@@ -122,7 +122,7 @@ Todas las aplicaciones se instalan bajo `/home/${ADMIN_USER}/apps/`:
 ```
 /home/ADMIN_USER/apps/
 ├── certs/                      # Certificados SSL (compartidos por todas las apps)
-│   ├── origin-cert.pem         # Cloudflare Origin Certificate
+│   ├── origin-cert.pem         # Let's Encrypt (wildcard)
 │   ├── origin-cert-key.pem     # Clave privada del certificado
 │   └── cloudflare-ca.crt       # CA Bundle de Cloudflare
 │
@@ -185,7 +185,7 @@ Todas las aplicaciones se instalan bajo `/home/${ADMIN_USER}/apps/`:
 | Script | Descripción |
 |--------|-------------|
 | `05_install_tailscale.sh` | Instalar Tailscale, autenticar, obtener IP VPN (100.x.x.x) |
-| `06_setup_certificates.sh` | Guiar obtención de Cloudflare Origin Certificate, subir al VPS |
+| `06_setup_certificates.sh` | Guiar obtención de Let's Encrypt (wildcard), subir al VPS |
 | `07_setup_dns.sh` | Crear registros DNS en Cloudflare vía API (*.vpn.DOMAIN → Tailscale IP) |
 
 ### FASE 4 — Gestión de contenedores (como admin user)
@@ -246,12 +246,12 @@ Con esto:
 
 ---
 
-## Certificados SSL: Cloudflare Origin Certificates
+## Certificados SSL: Let's Encrypt (wildcard)s
 
 ### ¿Por qué son necesarios?
 Los navegadores modernos requieren certificados SSL válidos para URLs HTTPS, incluso cuando se accede vía VPN privada.
 
-### Solución: Cloudflare Origin Certificates
+### Solución: Let's Encrypt (wildcard)s
 - **Gratuitos** — sin costo
 - **Larga validez** — hasta 15 años (sin renovaciones periódicas)
 - **Validación DNS** — validados vía Cloudflare DNS (no requiere acceso público al VPS)
@@ -287,7 +287,7 @@ VPSfacil/
 │   ├── 03_install_firewall.sh       # UFW + fix Docker/UFW
 │   ├── 04_install_docker.sh         # Docker CE + Compose v2
 │   ├── 05_install_tailscale.sh      # Tailscale VPN
-│   ├── 06_setup_certificates.sh     # Cloudflare Origin Certificates
+│   ├── 06_setup_certificates.sh     # Let's Encrypt (wildcard)s
 │   ├── 07_setup_dns.sh              # DNS Cloudflare vía API
 │   ├── 08_install_portainer.sh      # Portainer CE
 │   └── 09_install_kopia.sh          # Kopia Backup
