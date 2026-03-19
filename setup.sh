@@ -32,6 +32,7 @@ if [[ "$SCRIPT_DIR" == "" || "$SCRIPT_DIR" == "/dev/fd" || "$SCRIPT_DIR" == "/pr
     curl -sSL "${REPO_RAW}/lib/utils.sh"             -o "${TMP_LIB}/utils.sh"
     curl -sSL "${REPO_RAW}/lib/menu.sh"              -o "${TMP_LIB}/menu.sh"
     curl -sSL "${REPO_RAW}/lib/install_prompts.sh"   -o "${TMP_LIB}/install_prompts.sh"
+    curl -sSL "${REPO_RAW}/lib/portainer_api.sh"     -o "${TMP_LIB}/portainer_api.sh"
     LIB_DIR="$TMP_LIB"
     REMOTE_INSTALL=true
 else
@@ -268,6 +269,21 @@ while true; do
                 }
 
                 # ============================================================
+                # DESCARGAR INSTALL_CORE.SH AL HOME DEL ADMIN
+                # ============================================================
+                if [[ "$REMOTE_INSTALL" == "true" ]]; then
+                    log_process "Descargando script de FASE B..."
+                    REPO_RAW="https://raw.githubusercontent.com/JaimeCruzH/vpsfacil/main"
+                    # Crear directorio si no existe (debe existir después del paso 2)
+                    sudo -u "$ADMIN_USER" mkdir -p "/home/${ADMIN_USER}/vpsfacil"
+                    curl -sSL "${REPO_RAW}/scripts/install_core.sh" -o "/tmp/install_core.sh"
+                    sudo -u "$ADMIN_USER" cp "/tmp/install_core.sh" "/home/${ADMIN_USER}/install_core.sh"
+                    sudo -u "$ADMIN_USER" chmod +x "/home/${ADMIN_USER}/install_core.sh"
+                    rm -f "/tmp/install_core.sh"
+                    log_success "Script descargado en: /home/${ADMIN_USER}/install_core.sh ✓"
+                fi
+
+                # ============================================================
                 # INSTRUCCIONES PARA FASE B
                 # ============================================================
                 echo ""
@@ -292,9 +308,8 @@ while true; do
 
 4. Una vez conectado, abre una terminal (New Terminal Console)
 
-5. Ejecuta estos comandos:
-   ${COLOR_BOLD_GREEN}cd ~/vpsfacil${COLOR_RESET}
-   ${COLOR_BOLD_GREEN}bash scripts/install_core.sh${COLOR_RESET}
+5. Ejecuta UN SOLO comando:
+   ${COLOR_BOLD_GREEN}bash ~/install_core.sh${COLOR_RESET}
 
 6. El script ejecutará los pasos 4-11 sin interrupciones
    (Firewall, Docker, Certificados, DNS, Portainer, Kopia, File Browser)

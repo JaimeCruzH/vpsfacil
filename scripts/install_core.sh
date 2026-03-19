@@ -11,14 +11,35 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_DIR="$(dirname "$SCRIPT_DIR")"
+# ============================================================
+# DETECCIÓN: ¿REMOTE INSTALL O LOCAL?
+# ============================================================
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd 2>/dev/null || echo "$HOME")"
+REPO_DIR="${SCRIPT_DIR%/*}"  # Directorio padre
 LIB_DIR="${REPO_DIR}/lib"
+REMOTE_INSTALL=false
+
+# Si no podemos encontrar librerías locales, es remote install
+if [[ ! -f "${LIB_DIR}/colors.sh" ]]; then
+    REMOTE_INSTALL=true
+    TMP_LIB="/tmp/vpsfacil_core_lib"
+    mkdir -p "$TMP_LIB"
+
+    # Descargar librerías desde GitHub
+    REPO_RAW="https://raw.githubusercontent.com/JaimeCruzH/vpsfacil/main"
+    curl -sSL "${REPO_RAW}/lib/colors.sh"          -o "${TMP_LIB}/colors.sh"
+    curl -sSL "${REPO_RAW}/lib/config.sh"          -o "${TMP_LIB}/config.sh"
+    curl -sSL "${REPO_RAW}/lib/utils.sh"           -o "${TMP_LIB}/utils.sh"
+    curl -sSL "${REPO_RAW}/lib/portainer_api.sh"   -o "${TMP_LIB}/portainer_api.sh"
+
+    LIB_DIR="$TMP_LIB"
+fi
 
 # Cargar librerías
 source "${LIB_DIR}/colors.sh"
 source "${LIB_DIR}/config.sh"
 source "${LIB_DIR}/utils.sh"
+source "${LIB_DIR}/portainer_api.sh"
 
 # ============================================================
 # CARGAR CONFIGURACIÓN GUARDADA EN FASE A
@@ -84,7 +105,16 @@ run_step() {
     log_step "Paso $step_num: $description"
     echo ""
 
-    if bash "${REPO_DIR}/${script_name}"; then
+    if [[ "$REMOTE_INSTALL" == "true" ]]; then
+        # Descargar script temporalmente desde GitHub
+        local REPO_RAW="https://raw.githubusercontent.com/JaimeCruzH/vpsfacil/main"
+        bash <(curl -sSL "${REPO_RAW}/${script_name}")
+    else
+        # Ejecutar script local
+        bash "${REPO_DIR}/${script_name}"
+    fi
+
+    if [[ $? -eq 0 ]]; then
         log_success "Paso $step_num completado ✓"
     else
         log_error "Paso $step_num falló. Aborting."
