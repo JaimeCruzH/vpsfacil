@@ -30,7 +30,7 @@ if [[ ! -f "${LIB_DIR}/colors.sh" ]]; then
     curl -sSL "${REPO_RAW}/lib/colors.sh"          -o "${TMP_LIB}/colors.sh"
     curl -sSL "${REPO_RAW}/lib/config.sh"          -o "${TMP_LIB}/config.sh"
     curl -sSL "${REPO_RAW}/lib/utils.sh"           -o "${TMP_LIB}/utils.sh"
-    curl -sSL "${REPO_RAW}/lib/portainer_api.sh"   -o "${TMP_LIB}/portainer_api.sh"
+    # NOTA: portainer_api.sh se descarga más adelante, después de que APPS_DIR esté definido
 
     LIB_DIR="$TMP_LIB"
 fi
