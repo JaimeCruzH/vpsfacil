@@ -781,52 +781,6 @@ echo ""
 # Pedir configuración inicial
 ask_initial_config
 
-# ============================================================
-# LIMPIEZA PRE-INSTALACIÓN
-# ============================================================
-echo ""
-log_step "Verificación de usuarios del sistema"
-echo ""
-
-# Detectar usuarios adicionales (no root, no system users)
-EXTRA_USERS=$(getent passwd | awk -F: '$3 >= 1000 {print $1}' | grep -v "^${ADMIN_USER}$" || true)
-
-if [[ -n "$EXTRA_USERS" ]]; then
-    log_warning "Se detectaron usuarios adicionales en el sistema:"
-    echo "$EXTRA_USERS" | while read user; do
-        log_warning "  - $user"
-    done
-    echo ""
-
-    if confirm "¿Deseas eliminarlos para comenzar con una instalación limpia?"; then
-        echo "$EXTRA_USERS" | while read user; do
-            log_process "Eliminando usuario: $user"
-            userdel -r "$user" 2>/dev/null || true
-            log_success "Usuario $user eliminado"
-        done
-        echo ""
-    else
-        log_error "No se puede continuar con usuarios adicionales. Operación cancelada."
-        exit 1
-    fi
-else
-    log_success "Sistema limpio - solo root detectado"
-fi
-
-# Verificar si el usuario admin a crear ya existe
-if id "${ADMIN_USER}" &>/dev/null; then
-    log_warning "El usuario '${ADMIN_USER}' ya existe en el sistema"
-    if confirm "¿Deseas eliminarlo y recrearlo desde cero?"; then
-        log_process "Eliminando usuario existente: ${ADMIN_USER}"
-        userdel -r "${ADMIN_USER}" 2>/dev/null || true
-        log_success "Usuario ${ADMIN_USER} eliminado"
-    else
-        log_error "No se puede continuar. El usuario ${ADMIN_USER} ya existe."
-        exit 1
-    fi
-fi
-
-echo ""
 
 # Ejecutar PASO 1: precheck
 log_step "Paso 1 - Verificaciones previas"
