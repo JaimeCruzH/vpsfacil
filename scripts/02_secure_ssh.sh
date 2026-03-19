@@ -215,28 +215,14 @@ fi
 # ============================================================
 echo ""
 print_separator
-log_warning "ACCIÓN REQUERIDA — NO CIERRES ESTA VENTANA TODAVÍA"
 echo ""
-
-windows_instruction "VERIFICA TU ACCESO SSH ANTES DE CONTINUAR
-
-1. Abre una NUEVA ventana de Bitvise SSH Client
-   (NO cierres la conexión actual)
-
-2. Intenta conectarte con:
-   - Host: IP de tu VPS
-   - Puerto: ${SSH_PORT}
-   - Usuario: ${ADMIN_USER}
-   - Autenticación: publickey (llave SSH)
-
-3. Si la conexión funciona:
-   → Vuelve aquí y presiona Enter para continuar
-
-4. Si la conexión FALLA:
-   → No cierres esta ventana
-   → Dinos qué error aparece para diagnosticar el problema"
-
-wait_for_user "Presiona Enter SOLO cuando hayas verificado que tu acceso SSH funciona..."
+log_info "Si puedes leer este mensaje, tu conexión SSH con '${ADMIN_USER}' sigue activa."
+log_info "La nueva configuración de SSH se aplicó correctamente."
+echo ""
+log_info "A partir de ahora root NO puede conectarse por SSH."
+log_info "Solo '${ADMIN_USER}' con llave SSH tiene acceso."
+echo ""
+wait_for_user "Presiona Enter para continuar..."
 
 # ============================================================
 # RESUMEN FINAL
