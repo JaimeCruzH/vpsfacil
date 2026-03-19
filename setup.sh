@@ -120,14 +120,14 @@ show_main_menu() {
     echo -e "  ${COLOR_BOLD_GREEN}8)${COLOR_RESET} Configurar DNS en Cloudflare"
     echo -e "  ${COLOR_BOLD_GREEN}9)${COLOR_RESET} Instalar Portainer (gestión de contenedores)"
     echo -e "  ${COLOR_BOLD_GREEN}10)${COLOR_RESET} Instalar Kopia Backup"
+    echo -e "  ${COLOR_BOLD_GREEN}11)${COLOR_RESET} Instalar File Browser (gestor de archivos web)"
     echo ""
     print_separator
     echo ""
     echo -e "  ${COLOR_BOLD_WHITE}APLICACIONES OPCIONALES:${COLOR_RESET}"
     echo ""
-    echo -e "  ${COLOR_BOLD_CYAN}11)${COLOR_RESET} Instalar N8N (automatización de flujos)"
-    echo -e "  ${COLOR_BOLD_CYAN}12)${COLOR_RESET} Instalar OpenClaw (asistente IA - solo VPN)"
-    echo -e "  ${COLOR_BOLD_CYAN}13)${COLOR_RESET} Instalar File Browser (gestor de archivos web)"
+    echo -e "  ${COLOR_BOLD_CYAN}12)${COLOR_RESET} Instalar N8N (automatización de flujos)"
+    echo -e "  ${COLOR_BOLD_CYAN}13)${COLOR_RESET} Instalar OpenClaw (asistente IA - solo VPN)"
     echo ""
     print_separator
     echo ""
@@ -215,13 +215,13 @@ while true; do
         8)  run_script "scripts/07_setup_dns.sh" ;;
         9)  run_script "scripts/08_install_portainer.sh" ;;
         10) run_script "scripts/09_install_kopia.sh" ;;
-        11) run_script "apps/n8n.sh" ;;
-        12) run_script "apps/openclaw.sh" ;;
-        13) run_script "apps/filebrowser.sh" ;;
+        11) run_script "scripts/10_install_filebrowser.sh" ;;
+        12) run_script "apps/n8n.sh" ;;
+        13) run_script "apps/openclaw.sh" ;;
 
         A)  # Instalación completa automática
             print_header "Instalación Completa Automática"
-            log_warning "Esto instalará todos los componentes core en orden."
+            log_warning "Esto instalará todos los componentes core en orden (1-11)."
             log_info    "Las aplicaciones opcionales se preguntarán al finalizar."
             echo ""
             if confirm "¿Iniciar instalación completa?"; then
@@ -235,7 +235,8 @@ while true; do
                     "scripts/06_setup_certificates.sh" \
                     "scripts/07_setup_dns.sh" \
                     "scripts/08_install_portainer.sh" \
-                    "scripts/09_install_kopia.sh"
+                    "scripts/09_install_kopia.sh" \
+                    "scripts/10_install_filebrowser.sh"
                 do
                     run_script "$script"
                 done
@@ -245,9 +246,8 @@ while true; do
                 echo ""
                 log_info "¿Deseas instalar aplicaciones opcionales?"
                 echo ""
-                confirm "¿Instalar N8N?"         && run_script "apps/n8n.sh"
-                confirm "¿Instalar OpenClaw?"    && run_script "apps/openclaw.sh"
-                confirm "¿Instalar File Browser?" && run_script "apps/filebrowser.sh"
+                confirm "¿Instalar N8N?"      && run_script "apps/n8n.sh"
+                confirm "¿Instalar OpenClaw?" && run_script "apps/openclaw.sh"
 
                 print_header "¡Instalación Finalizada!"
                 log_success "Tu VPS está configurado y listo para usar."
