@@ -5,12 +5,11 @@
 #
 # Qué hace este script:
 #   1. Crea estructura de directorios para File Browser
-#   2. Configura acceso al directorio /apps/ del servidor
-#   3. Despliega File Browser vía Docker con HTTPS
-#   4. Configura usuario admin con contraseña segura
+#   2. Despliega File Browser vía Docker con HTTPS
+#   3. Muestra instrucciones para el primer acceso
 #
-# File Browser permite explorar y gestionar archivos del
-# servidor desde el navegador con interfaz amigable.
+# Credenciales por defecto: admin / admin
+# El usuario las cambia desde la interfaz web.
 #
 # Acceso: https://files.vpn.DOMAIN:8080 (solo Tailscale VPN)
 #
@@ -61,41 +60,7 @@ chown -R "${ADMIN_USER}:${ADMIN_USER}" "$APP_DIR"
 log_success "Directorio: ${APP_DIR} ✓"
 
 # ============================================================
-# 2. CONFIGURAR USUARIO ADMIN
-# ============================================================
-log_step "Configuración del usuario administrador"
-
-echo ""
-FB_USER=$(prompt_input "Nombre de usuario para File Browser" "${ADMIN_USER}")
-
-while true; do
-    FB_PASS=$(prompt_password "Contraseña para File Browser")
-    FB_PASS2=$(prompt_password "Confirma la contraseña")
-    if [[ "$FB_PASS" == "$FB_PASS2" && ${#FB_PASS} -ge 8 ]]; then
-        break
-    elif [[ "$FB_PASS" != "$FB_PASS2" ]]; then
-        log_warning "Las contraseñas no coinciden."
-    else
-        log_warning "Mínimo 8 caracteres."
-    fi
-done
-
-# ============================================================
-# 3. CREAR ARCHIVO .ENV
-# ============================================================
-cat > "${APP_DIR}/.env" << EOF
-# File Browser — VPSfacil
-FB_USER=${FB_USER}
-FB_PASS=${FB_PASS}
-TZ=${TIMEZONE}
-EOF
-
-chmod 600 "${APP_DIR}/.env"
-chown "${ADMIN_USER}:${ADMIN_USER}" "${APP_DIR}/.env"
-log_success "Credenciales guardadas ✓"
-
-# ============================================================
-# 4. CREAR CONFIGURACIÓN DE FILE BROWSER
+# 2. CREAR CONFIGURACIÓN DE FILE BROWSER
 # ============================================================
 log_step "Creando configuración"
 
@@ -114,9 +79,10 @@ cat > "${APP_DIR}/config/filebrowser.json" << EOF
 EOF
 
 chown -R "${ADMIN_USER}:${ADMIN_USER}" "${APP_DIR}/config"
+log_success "Configuración creada ✓"
 
 # ============================================================
-# 5. PREPARAR Y DESPLEGAR VÍA PORTAINER
+# 3. PREPARAR Y DESPLEGAR VÍA PORTAINER
 # ============================================================
 log_step "Generando docker-compose.yml"
 
@@ -125,6 +91,7 @@ COMPOSE_CONTENT=$(cat << EOF
 # File Browser — VPSfacil
 # Acceso: https://files.vpn.${DOMAIN}:${PORT_FILEBROWSER}
 # Solo vía Tailscale VPN
+# Credenciales por defecto: admin / admin
 # ============================================================
 services:
   filebrowser:
@@ -153,13 +120,12 @@ networks:
 EOF
 )
 
-# Guardar docker-compose.yml de referencia
 echo "$COMPOSE_CONTENT" > "${APP_DIR}/docker-compose.yml"
 chown "${ADMIN_USER}:${ADMIN_USER}" "${APP_DIR}/docker-compose.yml"
 log_success "docker-compose.yml generado ✓"
 
 # ============================================================
-# 6. DESPLEGAR
+# 4. DESPLEGAR
 # ============================================================
 log_step "Desplegando File Browser via Portainer"
 
@@ -179,96 +145,30 @@ wait_for_port "localhost" "${PORT_FILEBROWSER}" 60
 log_success "File Browser está corriendo ✓"
 
 # ============================================================
-# 7. CONFIGURAR USUARIO ADMIN VÍA API
-# ============================================================
-log_step "Configurando usuario administrador"
-
-log_process "Esperando que File Browser esté completamente listo (10s)..."
-sleep 10
-
-# File Browser arranca con usuario por defecto: admin / admin
-# Usamos la API para renombrar ese usuario y cambiar su contraseña
-log_process "Autenticando con credenciales por defecto (admin/admin)..."
-
-# Capturar respuesta en variable separada para que jq no falle el script
-# bajo set -euo pipefail cuando el output no sea JSON válido
-FB_LOGIN_RESP=$(curl -sk -X POST "https://localhost:${PORT_FILEBROWSER}/api/login" \
-    -H "Content-Type: application/json" \
-    -d '{"username":"admin","password":"admin","recaptcha":""}' 2>/dev/null) || true
-
-FB_TOKEN=$(echo "$FB_LOGIN_RESP" | jq -r '.token // ""' 2>/dev/null) || true
-
-if [[ -n "$FB_TOKEN" ]]; then
-    # Obtener ID del usuario admin (normalmente es 1)
-    FB_USERS_RESP=$(curl -sk -X GET "https://localhost:${PORT_FILEBROWSER}/api/users" \
-        -H "X-Auth: ${FB_TOKEN}" 2>/dev/null) || true
-    ADMIN_ID=$(echo "$FB_USERS_RESP" | jq -r '.[0].id // 1' 2>/dev/null) || true
-    ADMIN_ID="${ADMIN_ID:-1}"
-
-    # Actualizar usuario: cambiar nombre y contraseña
-    UPDATE_BODY=$(jq -n \
-        --argjson id "$ADMIN_ID" \
-        --arg u  "$FB_USER" \
-        --arg p  "$FB_PASS" \
-        '{
-            id: $id,
-            username: $u,
-            password: $p,
-            locale: "es",
-            hideDotfiles: false,
-            dateFormat: false,
-            perm: {
-                admin: true, execute: true, create: true,
-                rename: true, modify: true, delete: true,
-                share: true, download: true
-            }
-        }')
-
-    HTTP_STATUS=$(curl -sk -o /dev/null -w "%{http_code}" \
-        -X PUT "https://localhost:${PORT_FILEBROWSER}/api/users/${ADMIN_ID}" \
-        -H "X-Auth: ${FB_TOKEN}" \
-        -H "Content-Type: application/json" \
-        -d "$UPDATE_BODY" 2>/dev/null) || true
-
-    if [[ "$HTTP_STATUS" == "200" ]]; then
-        log_success "Usuario '${FB_USER}' configurado correctamente ✓"
-    else
-        log_warning "No se pudo actualizar el usuario (HTTP ${HTTP_STATUS})."
-        log_info    "Accede a ${URL_FILEBROWSER} con: admin / admin"
-        log_info    "Luego cambia las credenciales en Settings → User Management"
-    fi
-else
-    log_warning "No se pudo autenticar con File Browser."
-    log_info    "Accede a ${URL_FILEBROWSER} con: admin / admin"
-    log_info    "Luego cambia las credenciales en Settings → User Management"
-fi
-
-# ============================================================
-# INSTRUCCIONES
+# INSTRUCCIONES DE PRIMER ACCESO
 # ============================================================
 echo ""
-windows_instruction "ACCESO A FILE BROWSER
+windows_instruction "PRIMER ACCESO A FILE BROWSER
 
 1. Activa Tailscale VPN en Windows
 
 2. Abre tu navegador y ve a:
    ${URL_FILEBROWSER}
 
-3. Ingresa tus credenciales:
-   Usuario:    ${FB_USER}
-   Contraseña: (la que configuraste)
+3. Ingresa las credenciales por defecto:
+   Usuario:    admin
+   Contraseña: admin
 
-4. Tendrás acceso a:
+4. Para cambiar usuario y contraseña (recomendado):
+   → Haz clic en tu nombre (arriba a la derecha)
+   → Selecciona 'User Management'
+   → Edita el usuario admin: cambia nombre y contraseña
+   → Guarda los cambios
+
+5. Tendrás acceso a:
    /apps   → Todas las aplicaciones instaladas
    /home   → Directorio home de ${ADMIN_USER} (solo lectura)
-   /local  → Almacenamiento local de File Browser
-
-FUNCIONES DISPONIBLES:
-   - Navegar y ver archivos
-   - Subir y descargar archivos
-   - Crear, mover, renombrar y eliminar
-   - Editar archivos de texto directamente
-   - Compartir archivos con enlaces temporales"
+   /local  → Almacenamiento local de File Browser"
 
 # ============================================================
 # RESUMEN
@@ -279,9 +179,10 @@ echo ""
 log_success "File Browser instalado exitosamente"
 echo ""
 echo -e "  ${COLOR_BOLD_WHITE}Acceso:${COLOR_RESET}"
-echo -e "    URL:       ${COLOR_CYAN}${URL_FILEBROWSER}${COLOR_RESET}"
-echo -e "    Usuario:   ${COLOR_CYAN}${FB_USER}${COLOR_RESET}"
-echo -e "    Acceso:    ${COLOR_YELLOW}Solo con Tailscale VPN activo${COLOR_RESET}"
+echo -e "    URL:          ${COLOR_CYAN}${URL_FILEBROWSER}${COLOR_RESET}"
+echo -e "    Usuario:      ${COLOR_CYAN}admin${COLOR_RESET}"
+echo -e "    Contraseña:   ${COLOR_CYAN}admin${COLOR_RESET} (cambia desde la interfaz web)"
+echo -e "    Acceso:       ${COLOR_YELLOW}Solo con Tailscale VPN activo${COLOR_RESET}"
 echo ""
 echo -e "  ${COLOR_BOLD_WHITE}Carpetas accesibles:${COLOR_RESET}"
 echo -e "    /apps  → ${COLOR_CYAN}${APPS_DIR}${COLOR_RESET}"
