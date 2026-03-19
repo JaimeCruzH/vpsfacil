@@ -204,6 +204,20 @@ _save_tailscale_ip "$TAILSCALE_IP"
 log_success "IP Tailscale guardada: ${TAILSCALE_IP} ✓"
 
 # ============================================================
+# Permitir todo el tráfico entrante por la interfaz Tailscale
+# Esto es necesario para que las apps (Portainer, N8N, etc.)
+# sean accesibles desde la VPN sin abrir puertos al internet.
+# ============================================================
+log_step "Configurando UFW para tráfico Tailscale"
+
+if command -v ufw &>/dev/null; then
+    ufw allow in on tailscale0 comment "Permitir todo tráfico VPN Tailscale" 2>/dev/null || true
+    log_success "UFW: tráfico entrante por Tailscale VPN permitido ✓"
+else
+    log_info "UFW no instalado aún — la regla se aplicará en el paso 4"
+fi
+
+# ============================================================
 # 6. VERIFICAR CONECTIVIDAD DESDE PC WINDOWS
 # ============================================================
 echo ""

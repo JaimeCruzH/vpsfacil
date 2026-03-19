@@ -137,14 +137,17 @@ log_process "Abriendo puerto Tailscale VPN (${PORT_TAILSCALE}/UDP)..."
 ufw allow "${PORT_TAILSCALE}/udp" comment "Tailscale VPN WireGuard" > /dev/null 2>&1
 log_success "Puerto Tailscale ${PORT_TAILSCALE}/UDP abierto ✓"
 
-# --- NOTA: NO abrimos puertos de aplicaciones ---
-# Portainer (9000), N8N (5678), OpenClaw (18789), etc.
-# están accesibles SOLO via Tailscale VPN (IP 100.x.x.x)
-# UFW bloquea acceso desde internet a esos puertos
-
-log_info ""
-log_info "Puertos de aplicaciones (Portainer, N8N, etc.) NO abiertos."
-log_info "Solo serán accesibles vía Tailscale VPN — esto es intencional."
+# --- Interfaz Tailscale: permitir todo el tráfico VPN ---
+# Las apps (Portainer, N8N, etc.) son accesibles SOLO via Tailscale.
+# En lugar de abrir puertos individuales al internet, permitimos
+# todo el tráfico que llega por la interfaz virtual tailscale0.
+# Si Tailscale aún no está instalado, la regla se aplicará luego.
+if ip link show tailscale0 &>/dev/null 2>&1; then
+    ufw allow in on tailscale0 comment "Permitir todo tráfico VPN Tailscale" > /dev/null 2>&1
+    log_success "Tráfico Tailscale VPN permitido ✓"
+else
+    log_info "Tailscale aún no instalado — la regla se aplica en el paso 6"
+fi
 
 # ============================================================
 # 4. HABILITAR UFW
