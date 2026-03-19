@@ -172,7 +172,12 @@ wait_for_user() {
     local mensaje="${1:-Presiona Enter para continuar...}"
     echo ""
     echo -ne "${PREFIX_PROMPT} ${mensaje}"
-    read -r
+    # Intentar leer desde /dev/tty, fallback a stdin
+    if [[ -t 0 ]]; then
+        read -r
+    else
+        read -r < /dev/tty || true
+    fi
     echo ""
 }
 
