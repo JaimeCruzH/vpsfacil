@@ -157,12 +157,22 @@ EOF
 # ============================================================
 # CARGAR CONFIGURACIÓN GUARDADA EN FASE A (O RECOLECTAR SI NO EXISTE)
 # ============================================================
-CONFIG_FILE="/tmp/vpsfacil_install.conf"
+# Buscar configuración en los mismos lugares donde setup.sh la guarda
+CONFIG_FILE=""
 
-if [[ ! -f "$CONFIG_FILE" ]]; then
+if [[ -f "/tmp/vpsfacil_setup.conf" ]]; then
+    CONFIG_FILE="/tmp/vpsfacil_setup.conf"
+elif [[ -f "${HOME}/setup.conf" ]]; then
+    CONFIG_FILE="${HOME}/setup.conf"
+elif [[ -f "/root/setup.conf" ]]; then
+    CONFIG_FILE="/root/setup.conf"
+fi
+
+if [[ -z "$CONFIG_FILE" ]]; then
     log_info "No se encontró configuración previa. Recolectando datos..."
     echo ""
     collect_all_inputs
+    CONFIG_FILE="/tmp/vpsfacil_install.conf"
 fi
 
 # Cargar configuración

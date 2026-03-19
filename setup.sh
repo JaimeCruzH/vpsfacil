@@ -582,7 +582,7 @@ TIMEZONE="${TIMEZONE:-America/Santiago}"
 INSTALLATION_DATE="$(date '+%Y-%m-%d')"
 EOF
 
-    chmod 600 "$config_file"
+    chmod 644 "$config_file"
     log_success "Configuración guardada en: ${config_file}"
 }
 
