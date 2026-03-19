@@ -115,6 +115,7 @@ confirm() {
     while true; do
         echo -ne "${PREFIX_PROMPT} ${prompt} ${COLOR_BOLD_WHITE}(sí/no)${COLOR_RESET}: "
         read -r respuesta
+        respuesta="${respuesta//$'\r'/}"  # strip CRLF artifacts
         case "${respuesta,,}" in
             si|sí|s|yes|y) return 0 ;;
             no|n)           return 1 ;;
@@ -154,6 +155,7 @@ prompt_password() {
 
     echo -ne "${PREFIX_PROMPT} ${prompt}: "
     read -rs pass
+    pass="${pass//$'\r'/}"  # strip CRLF artifacts
     echo ""
     echo "$pass"
 }

@@ -195,6 +195,7 @@ while true; do
     show_main_menu
     echo -ne "${PREFIX_PROMPT} Selecciona una opción: "
     read -r opcion
+    opcion="${opcion//$'\r'/}"  # strip CRLF artifacts
 
     case "${opcion^^}" in
         1)  run_script "scripts/00_precheck.sh" ;;

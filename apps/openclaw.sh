@@ -124,6 +124,7 @@ log_info "Termina con ENTER + CTRL+D:"
 echo ""
 CLAUDE_WEB_COOKIE=""
 while IFS= read -r linea; do
+    linea="${linea//$'\r'/}"  # strip CRLF artifacts
     CLAUDE_WEB_COOKIE+="${linea}"
 done
 

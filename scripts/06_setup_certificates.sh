@@ -131,6 +131,7 @@ echo ""
 # Leer el certificado (múltiples líneas, termina con Ctrl+D)
 CERT_CONTENT=""
 while IFS= read -r linea; do
+    linea="${linea//$'\r'/}"  # strip CRLF artifacts
     CERT_CONTENT+="${linea}"$'\n'
 done
 
@@ -164,6 +165,7 @@ echo ""
 
 KEY_CONTENT=""
 while IFS= read -r linea; do
+    linea="${linea//$'\r'/}"  # strip CRLF artifacts
     KEY_CONTENT+="${linea}"$'\n'
 done
 
