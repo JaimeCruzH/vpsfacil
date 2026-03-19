@@ -441,11 +441,32 @@ ask_initial_config() {
         ADMIN_USER="${ADMIN_USER,,}"
 
         if [[ "$ADMIN_USER" =~ ^[a-z][a-z0-9_]{1,31}$ ]]; then
-            break
+            # Validar que el usuario sea válido, luego verificar si existe
+            if getent passwd "$ADMIN_USER" > /dev/null 2>&1; then
+                # El usuario ya existe
+                echo ""
+                log_warning "El usuario '${ADMIN_USER}' ya existe en el sistema"
+                if confirm "¿Deseas eliminarlo y recrearlo desde cero?"; then
+                    echo ""
+                    log_process "Eliminando usuario existente: ${ADMIN_USER}"
+                    userdel -r "$ADMIN_USER" 2>/dev/null || true
+                    log_success "Usuario ${ADMIN_USER} eliminado ✓"
+                    echo ""
+                    break
+                else
+                    log_warning "Por favor, elige un nombre de usuario diferente"
+                    echo ""
+                    continue
+                fi
+            else
+                # El usuario no existe - OK, podemos continuar
+                break
+            fi
         else
             log_warning "Nombre inválido. Solo letras minúsculas, números y guión bajo."
             log_info    "Correcto:   jaime  |  admin  |  mi_usuario"
             log_info    "Incorrecto: Mi Usuario  |  123admin  |  admin@host"
+            echo ""
         fi
     done
 
@@ -453,21 +474,7 @@ ask_initial_config() {
     print_separator
     echo ""
 
-    echo -e "${COLOR_BOLD_WHITE}PREGUNTA 3 de 3 — Zona horaria${COLOR_RESET}"
-    echo ""
-    log_info "Define la zona horaria del servidor (afecta logs y backups)."
-    log_info "Ejemplos:"
-    log_info "  América: America/Santiago  |  America/Bogota  |  America/Mexico_City"
-    log_info "  Europa:  Europe/Madrid     |  Europe/London"
-    log_info "  Si no estás seguro, usa: UTC"
-    echo ""
-    TIMEZONE=$(prompt_input "¿Cuál es tu zona horaria?" "America/Santiago")
-
-    echo ""
-    print_separator
-    echo ""
-
-    # Pedir contraseña del nuevo usuario
+    # Pedir contraseña del nuevo usuario (PARTE DE PREGUNTA 2)
     log_step "Contraseña del usuario administrador"
     echo ""
     log_info "Define una contraseña para el usuario '${ADMIN_USER}'."
@@ -488,6 +495,20 @@ ask_initial_config() {
             log_warning "Las contraseñas no coinciden. Intenta de nuevo."
         fi
     done
+
+    echo ""
+    print_separator
+    echo ""
+
+    echo -e "${COLOR_BOLD_WHITE}PREGUNTA 3 de 3 — Zona horaria${COLOR_RESET}"
+    echo ""
+    log_info "Define la zona horaria del servidor (afecta logs y backups)."
+    log_info "Ejemplos:"
+    log_info "  América: America/Santiago  |  America/Bogota  |  America/Mexico_City"
+    log_info "  Europa:  Europe/Madrid     |  Europe/London"
+    log_info "  Si no estás seguro, usa: UTC"
+    echo ""
+    TIMEZONE=$(prompt_input "¿Cuál es tu zona horaria?" "America/Santiago")
 
     echo ""
     print_separator
