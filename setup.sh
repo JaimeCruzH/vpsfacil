@@ -441,7 +441,23 @@ ask_initial_config() {
         ADMIN_USER="${ADMIN_USER,,}"
 
         if [[ "$ADMIN_USER" =~ ^[a-z][a-z0-9_]{1,31}$ ]]; then
-            break
+            # Verificar si el usuario ya existe
+            if id "$ADMIN_USER" &>/dev/null; then
+                echo ""
+                log_warning "El usuario '$ADMIN_USER' ya existe en el sistema"
+                if confirm "¿Deseas eliminarlo y recrearlo desde cero?"; then
+                    log_process "Eliminando usuario existente: $ADMIN_USER"
+                    userdel -r "$ADMIN_USER" 2>/dev/null || true
+                    log_success "Usuario $ADMIN_USER eliminado"
+                    echo ""
+                    break
+                else
+                    log_warning "Por favor, elige un nombre de usuario diferente"
+                    echo ""
+                fi
+            else
+                break
+            fi
         else
             log_warning "Nombre inválido. Solo letras minúsculas, números y guión bajo."
             log_info    "Correcto:   jaime  |  admin  |  mi_usuario"
@@ -732,14 +748,11 @@ echo ""
 # Pedir configuración inicial
 ask_initial_config
 
-# ============================================================
-# LIMPIEZA PRE-INSTALACIÓN
-# ============================================================
+# Detectar y eliminar otros usuarios adicionales (que no sean root ni el admin que se crea)
 echo ""
 log_step "Verificación de usuarios del sistema"
 echo ""
 
-# Detectar usuarios adicionales (no root, no system users)
 EXTRA_USERS=$(getent passwd | awk -F: '$3 >= 1000 {print $1}' | grep -v "^${ADMIN_USER}$" || true)
 
 if [[ -n "$EXTRA_USERS" ]]; then
@@ -762,22 +775,8 @@ if [[ -n "$EXTRA_USERS" ]]; then
     fi
 else
     log_success "Sistema limpio - solo root detectado"
+    echo ""
 fi
-
-# Verificar si el usuario admin a crear ya existe
-if id "${ADMIN_USER}" &>/dev/null; then
-    log_warning "El usuario '${ADMIN_USER}' ya existe en el sistema"
-    if confirm "¿Deseas eliminarlo y recrearlo desde cero?"; then
-        log_process "Eliminando usuario existente: ${ADMIN_USER}"
-        userdel -r "${ADMIN_USER}" 2>/dev/null || true
-        log_success "Usuario ${ADMIN_USER} eliminado"
-    else
-        log_error "No se puede continuar. El usuario ${ADMIN_USER} ya existe."
-        exit 1
-    fi
-fi
-
-echo ""
 
 # Ejecutar PASO 1: precheck
 log_step "Paso 1 - Verificaciones previas"
