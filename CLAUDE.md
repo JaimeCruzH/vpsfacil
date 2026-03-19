@@ -140,6 +140,10 @@ Todas las aplicaciones se instalan bajo `/home/${ADMIN_USER}/apps/`:
 │   ├── config/
 │   └── cache/
 │
+├── filebrowser/                # File Browser (core, solo VPN, sin auth)
+│   ├── docker-compose.yml
+│   └── data/
+│
 ├── n8n/                        # N8N (opcional, solo VPN)
 │   ├── docker-compose.yml
 │   ├── .env
@@ -151,12 +155,6 @@ Todas las aplicaciones se instalan bajo `/home/${ADMIN_USER}/apps/`:
 │   ├── .env
 │   ├── config/                 # → /home/node/.openclaw
 │   └── data/                   # → /home/node/.openclaw/workspace
-│
-├── filebrowser/                # File Browser (opcional, solo VPN)
-│   ├── docker-compose.yml
-│   ├── .env
-│   ├── config/
-│   └── data/
 │
 └── backups/                    # Almacén de backups de Kopia
 ```
@@ -200,13 +198,18 @@ Todas las aplicaciones se instalan bajo `/home/${ADMIN_USER}/apps/`:
 |--------|-------------|
 | `09_install_kopia.sh` | Kopia Backup vía Docker, configurar schedule automático |
 
-### FASE 6 — Aplicaciones opcionales (menú interactivo)
+### FASE 6 — Gestor de archivos (como admin user)
 
 | Script | Descripción |
 |--------|-------------|
-| `apps/n8n.sh` | N8N + PostgreSQL 16 |
-| `apps/openclaw.sh` | OpenClaw (VPN-only, credenciales Claude) |
-| `apps/filebrowser.sh` | File Browser web |
+| `10_install_filebrowser.sh` | File Browser web (gestor de archivos con acceso VPN) |
+
+### FASE 7 — Aplicaciones opcionales (menú interactivo)
+
+| Script | Descripción |
+|--------|-------------|
+| `apps/n8n.sh` | N8N + PostgreSQL 16 (automatización de flujos) |
+| `apps/openclaw.sh` | OpenClaw (asistente IA, solo VPN, credenciales Claude) |
 
 ---
 
@@ -290,19 +293,17 @@ VPSfacil/
 │   ├── 06_setup_certificates.sh     # Let's Encrypt (wildcard)s
 │   ├── 07_setup_dns.sh              # DNS Cloudflare vía API
 │   ├── 08_install_portainer.sh      # Portainer CE
-│   └── 09_install_kopia.sh          # Kopia Backup
+│   ├── 09_install_kopia.sh          # Kopia Backup
+│   └── 10_install_filebrowser.sh    # File Browser web
 │
 ├── apps/                            # Instaladores de aplicaciones opcionales
-│   ├── n8n.sh
-│   ├── openclaw.sh
-│   └── filebrowser.sh
+│   ├── n8n.sh                       # N8N + PostgreSQL
+│   └── openclaw.sh                  # OpenClaw IA
 │
 ├── templates/                       # Plantillas Docker Compose
 │   ├── n8n/
 │   │   └── docker-compose.yml
 │   ├── openclaw/
-│   │   └── docker-compose.yml
-│   ├── filebrowser/
 │   │   └── docker-compose.yml
 │   ├── portainer/
 │   │   └── docker-compose.yml
