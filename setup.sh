@@ -277,19 +277,29 @@ while true; do
                 log_success "¡FASE A Completada!"
                 echo ""
                 echo -e "  ${COLOR_BOLD_WHITE}Próximo paso:${COLOR_RESET}"
-                echo -e "  Reconéctate al VPS como usuario ${COLOR_CYAN}${ADMIN_USER}${COLOR_RESET}:"
                 echo ""
-                echo -e "    ${COLOR_BOLD_GREEN}ssh ${ADMIN_USER}@TU_VPS_IP${COLOR_RESET}"
-                echo ""
-                echo -e "  Luego navega al directorio del proyecto y ejecuta:"
-                echo ""
-                echo -e "    ${COLOR_BOLD_GREEN}cd ~/vpsfacil${COLOR_RESET}"
-                echo -e "    ${COLOR_BOLD_GREEN}bash scripts/install_core.sh${COLOR_RESET}"
-                echo ""
-                echo -e "  Esto ejecutará los pasos 4, 6-11 sin interrupciones:"
-                echo -e "  (Firewall, Docker, Certificados, DNS, Portainer, Kopia, File Browser)"
-                echo ""
-                log_info "Tiempo estimado FASE B: 15-20 minutos"
+                windows_instruction "CONEXIÓN PARA FASE B (IMPORTANTE)
+
+1. En tu PC Windows, abre Bitvise SSH Client
+
+2. Configura la conexión:
+   ├─ Host:                TU_VPS_IP (la misma de ahora)
+   ├─ Port:                22 (o el puerto que configuraste)
+   ├─ Username:            ${COLOR_CYAN}${ADMIN_USER}${COLOR_RESET}
+   └─ Initial method:      Public key (usar la clave que ya tienes)
+
+3. Haz clic en 'Login'
+
+4. Una vez conectado, abre una terminal (New Terminal Console)
+
+5. Ejecuta estos comandos:
+   ${COLOR_BOLD_GREEN}cd ~/vpsfacil${COLOR_RESET}
+   ${COLOR_BOLD_GREEN}bash scripts/install_core.sh${COLOR_RESET}
+
+6. El script ejecutará los pasos 4-11 sin interrupciones
+   (Firewall, Docker, Certificados, DNS, Portainer, Kopia, File Browser)
+
+${COLOR_BOLD_YELLOW}Tiempo estimado FASE B: 15-20 minutos${COLOR_RESET}"
                 echo ""
                 print_separator
                 echo ""
