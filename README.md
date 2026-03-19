@@ -86,6 +86,55 @@ Each application folder contains:
 - All apps: `tar -czf full-apps-backup.tar.gz /home/jaime/apps/`
 - Kopia automates incremental backups
 
+## Progress Tracking & Recovery
+
+### Automatic Progress Saving
+
+If the installation is interrupted (network issue, timeout, etc.), **your progress is automatically saved**. You don't need to re-enter data or re-run completed steps.
+
+**How it works:**
+1. All your configuration (domain, username, passwords) is saved to `/tmp/vpsfacil_install.conf` after FASE A
+2. Each completed step is recorded in `/tmp/vpsfacil_core_progress.log`
+3. When you reconnect and re-run `install_core.sh`, it shows:
+   - ✓ Completed steps (with duration)
+   - ⏸ Pending steps
+   - Overall progress percentage
+
+### Resuming an Interrupted Installation
+
+If installation is interrupted in FASE B:
+
+```bash
+# Reconnect to your VPS as the admin user
+ssh adminuser@your-vps-ip
+
+# Re-run installation_core script - it will resume from where it stopped
+bash ~/install_core.sh
+```
+
+The script will display the current progress and continue with the next pending step. No re-entering of configuration needed.
+
+### Progress Bar Example
+
+```
+╔═══════════════════════════════════════════════════════════════╗
+║  FASE B - Instalación Core: Progreso 3/7 (43%)      ║
+╠═══════════════════════════════════════════════════════════════╣
+║                                                               ║
+║  [████████████░░░░░░░░░░░░░░░░] 43%                   ║
+║                                                               ║
+╠═══════════════════════════════════════════════════════════════╣
+║  ✓ Paso  4: Firewall UFW [completado en 2m15s]   ║
+║  ✓ Paso  6: Docker & Docker Compose [completado en 4m30s] ║
+║  ✓ Paso  7: Certificados SSL (Let's Encrypt) [completado en 1m45s] ║
+║  ⏸ Paso  8: DNS Cloudflare [en espera]          ║
+║  ⏸ Paso  9: Portainer [en espera]                ║
+║  ⏸ Paso 10: Kopia Backup [en espera]             ║
+║  ⏸ Paso 11: File Browser [en espera]             ║
+║                                                               ║
+╚═══════════════════════════════════════════════════════════════╝
+```
+
 ## After Installation
 
 ### Access Applications
