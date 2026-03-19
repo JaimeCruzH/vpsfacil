@@ -846,3 +846,10 @@ log_info "   puedes cerrar ESTA ventana del usuario root."
 echo ""
 print_separator
 echo ""
+
+# ============================================================
+# DETENER AQUÍ - FASE A COMPLETADA
+# ============================================================
+log_success "FASE A finalizada. Esperando tu próxima conexión como ${ADMIN_USER}..."
+echo ""
+exit 0
