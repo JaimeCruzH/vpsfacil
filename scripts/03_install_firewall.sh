@@ -72,6 +72,7 @@ log_step "Instalando UFW"
 if command_exists ufw; then
     log_info "UFW ya está instalado"
 else
+    wait_for_dpkg
     DEBIAN_FRONTEND=noninteractive apt-get install -y -q ufw > /dev/null 2>&1
     log_success "UFW instalado ✓"
 fi

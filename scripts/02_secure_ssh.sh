@@ -169,6 +169,8 @@ log_step "Instalando fail2ban (protección contra fuerza bruta)"
 log_info "Fail2ban bloquea automáticamente IPs que intentan"
 log_info "adivinar contraseñas o llaves SSH incorrectas."
 
+wait_for_dpkg
+
 DEBIAN_FRONTEND=noninteractive apt-get install -y -q fail2ban > /dev/null 2>&1
 
 # Crear configuración personalizada (no editar fail2ban.conf directamente)

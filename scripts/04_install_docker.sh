@@ -85,6 +85,8 @@ fi
 # ============================================================
 log_step "Eliminando versiones antiguas de Docker (si existen)"
 
+wait_for_dpkg
+
 PAQUETES_VIEJOS=(
     docker
     docker-engine

@@ -80,6 +80,8 @@ fi
 # ============================================================
 log_step "Instalando certbot y plugin Cloudflare"
 
+wait_for_dpkg
+
 apt-get update -q
 DEBIAN_FRONTEND=noninteractive apt-get install -y -q \
     certbot \
