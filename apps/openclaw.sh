@@ -208,6 +208,12 @@ log_success "Imagen openclaw-vpsfacil:latest construida ✓"
 # ============================================================
 log_step "Generando docker-compose.yml"
 
+# Escapar valores ingresados/pegados por el usuario para YAML de docker-compose
+# Las credenciales de Claude pueden contener $, =, ;, " y otros caracteres especiales
+CLAUDE_AI_SESSION_KEY_ESC=$(compose_escape "$CLAUDE_AI_SESSION_KEY")
+CLAUDE_WEB_SESSION_KEY_ESC=$(compose_escape "$CLAUDE_WEB_SESSION_KEY")
+CLAUDE_WEB_COOKIE_ESC=$(compose_escape "$CLAUDE_WEB_COOKIE")
+
 COMPOSE_CONTENT=$(cat << EOF
 # ============================================================
 # OpenClaw — VPSfacil
@@ -225,9 +231,9 @@ services:
       TZ: ${TIMEZONE}
       OPENCLAW_GATEWAY_TOKEN: ${GATEWAY_TOKEN}
       OPENCLAW_ALLOW_INSECURE_PRIVATE_WS: "true"
-      CLAUDE_AI_SESSION_KEY: ${CLAUDE_AI_SESSION_KEY}
-      CLAUDE_WEB_SESSION_KEY: ${CLAUDE_WEB_SESSION_KEY}
-      CLAUDE_WEB_COOKIE: ${CLAUDE_WEB_COOKIE}
+      CLAUDE_AI_SESSION_KEY: "${CLAUDE_AI_SESSION_KEY_ESC}"
+      CLAUDE_WEB_SESSION_KEY: "${CLAUDE_WEB_SESSION_KEY_ESC}"
+      CLAUDE_WEB_COOKIE: "${CLAUDE_WEB_COOKIE_ESC}"
     ports:
       - "${PORT_OPENCLAW_WS}:18789"
       - "${PORT_OPENCLAW_HTTP}:18790"

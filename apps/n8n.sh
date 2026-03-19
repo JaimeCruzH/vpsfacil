@@ -143,6 +143,12 @@ DB_USER="n8n_user"
 DB_NAME="n8n_db"
 DB_HOST="postgres_n8n"
 
+# Escapar valores ingresados por el usuario para YAML de docker-compose
+N8N_PASS_ESC=$(compose_escape "$N8N_PASS")
+N8N_EMAIL_ESC=$(compose_escape "$N8N_EMAIL")
+N8N_FIRSTNAME_ESC=$(compose_escape "$N8N_FIRSTNAME")
+N8N_LASTNAME_ESC=$(compose_escape "$N8N_LASTNAME")
+
 COMPOSE_CONTENT=$(cat << EOF
 # ============================================================
 # N8N + PostgreSQL — VPSfacil
@@ -198,10 +204,10 @@ services:
       N8N_SSL_KEY: /certs/key.pem
       N8N_EMAIL_MODE: ""
       N8N_DIAGNOSTICS_ENABLED: "false"
-      N8N_DEFAULT_USER_EMAIL: ${N8N_EMAIL}
-      N8N_DEFAULT_USER_PASSWORD: ${N8N_PASS}
-      N8N_DEFAULT_USER_FIRSTNAME: ${N8N_FIRSTNAME}
-      N8N_DEFAULT_USER_LASTNAME: ${N8N_LASTNAME}
+      N8N_DEFAULT_USER_EMAIL: "${N8N_EMAIL_ESC}"
+      N8N_DEFAULT_USER_PASSWORD: "${N8N_PASS_ESC}"
+      N8N_DEFAULT_USER_FIRSTNAME: "${N8N_FIRSTNAME_ESC}"
+      N8N_DEFAULT_USER_LASTNAME: "${N8N_LASTNAME_ESC}"
     ports:
       - "${PORT_N8N}:${PORT_N8N}"
     volumes:

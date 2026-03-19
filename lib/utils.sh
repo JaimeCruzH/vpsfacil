@@ -293,6 +293,30 @@ wait_for_port() {
 # UTILIDADES VARIAS
 # ============================================================
 
+# Escapar un valor para incrustar de forma segura en docker-compose YAML
+# (sección environment, entre comillas dobles)
+#
+# Problemas que resuelve:
+#   1. Docker Compose interpreta $VAR y ${VAR} en valores YAML.
+#      "test$5pass" → Docker Compose lo convierte en "testpass" (elimina $5).
+#      Fix: $ → $$ para que Docker Compose lo trate como literal.
+#   2. " sin escapar rompe el string YAML entre comillas dobles.
+#      Fix: " → \"
+#   3. \ sin escapar en YAML double-quoted genera secuencias de escape.
+#      Fix: \ → \\  (debe aplicarse PRIMERO)
+#
+# Uso en script:
+#   PASS_ESC=$(compose_escape "$PASS")
+#   # Luego en heredoc con comillas dobles en YAML:
+#   #   MY_VAR: "${PASS_ESC}"
+compose_escape() {
+    local val="$1"
+    val="${val//\\/\\\\}"    # \ → \\  (debe ser primero)
+    val="${val//\"/\\\"}"    # " → \"
+    val="${val//\$/\$\$}"    # $ → $$
+    echo "$val"
+}
+
 # Generar contraseña aleatoria segura
 # Uso: pass=$(generate_password 20)
 generate_password() {

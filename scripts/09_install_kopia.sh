@@ -109,6 +109,9 @@ log_success "Archivo .env creado (600) ✓"
 # ============================================================
 log_step "Generando configuración de Kopia"
 
+# Escapar caracteres especiales de valores ingresados por el usuario
+KOPIA_PASS_ESC=$(compose_escape "$KOPIA_PASS")
+
 COMPOSE_CONTENT=$(cat << EOF
 # ============================================================
 # Kopia Backup — VPSfacil
@@ -121,7 +124,7 @@ services:
     container_name: kopia
     restart: unless-stopped
     environment:
-      KOPIA_PASSWORD: ${KOPIA_PASS}
+      KOPIA_PASSWORD: "${KOPIA_PASS_ESC}"
       TZ: ${TIMEZONE}
     ports:
       - "51515:51515"
