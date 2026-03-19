@@ -60,6 +60,23 @@ chown -R "${ADMIN_USER}:${ADMIN_USER}" "$APP_DIR"
 log_success "Directorio: ${APP_DIR} ✓"
 
 # ============================================================
+# 2. LIMPIAR INSTALACIÓN ANTERIOR (si existe)
+# ============================================================
+# Detener contenedor existente para liberar el archivo de base de datos
+if docker ps -q --filter "name=filebrowser" 2>/dev/null | grep -q .; then
+    log_process "Deteniendo contenedor anterior..."
+    docker stop filebrowser 2>/dev/null || true
+    docker rm   filebrowser 2>/dev/null || true
+fi
+
+# Eliminar base de datos anterior para que File Browser inicie con admin/admin
+if [[ -f "${APP_DIR}/config/filebrowser.db" ]]; then
+    log_process "Eliminando base de datos anterior (restaurando credenciales por defecto)..."
+    rm -f "${APP_DIR}/config/filebrowser.db"
+    log_success "Base de datos limpiada ✓"
+fi
+
+# ============================================================
 # 2. CREAR CONFIGURACIÓN DE FILE BROWSER
 # ============================================================
 log_step "Creando configuración"
