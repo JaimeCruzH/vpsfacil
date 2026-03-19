@@ -30,11 +30,17 @@ source_config() {
 
     # 2. Buscar archivo de configuración en ubicaciones conocidas
     local config_file=""
-    for candidate in \
-        "${HOME}/setup.conf" \
-        "/tmp/vpsfacil_setup.conf" \
+    local candidates=(
+        "${HOME}/setup.conf"
+        "/tmp/vpsfacil_setup.conf"
         "/root/setup.conf"
-    do
+    )
+    # Si se ejecuta con sudo, buscar también en el home del usuario real
+    if [[ -n "${SUDO_USER:-}" && -d "/home/${SUDO_USER}" ]]; then
+        candidates+=("/home/${SUDO_USER}/setup.conf")
+    fi
+
+    for candidate in "${candidates[@]}"; do
         if [[ -f "$candidate" ]]; then
             config_file="$candidate"
             break

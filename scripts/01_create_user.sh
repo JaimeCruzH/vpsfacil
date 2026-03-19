@@ -312,5 +312,22 @@ echo -e "    Sudo:           ${COLOR_CYAN}Sin password (para automatización)${C
 echo -e "    SSH:            ${COLOR_CYAN}Por llave RSA 4096 bits${COLOR_RESET}"
 echo -e "    Llave privada:  ${COLOR_CYAN}${PRIVATE_KEY}${COLOR_RESET} (en el servidor)"
 echo ""
-log_info "Próximo paso: Seguridad SSH - deshabilitar acceso root (opción 3)"
+echo ""
+print_separator
+echo ""
+windows_instruction "CÓMO CONTINUAR LA INSTALACIÓN DESDE AHORA
+
+Desde este punto usarás el usuario '${ADMIN_USER}' para todo.
+Ya NO necesitas conectarte como root.
+
+PASO A: Abre una nueva conexión en Bitvise con:
+   Host:     IP de tu VPS
+   Puerto:   ${SSH_PORT:-22}
+   Usuario:  ${ADMIN_USER}
+   Auth:     publickey → selecciona ${ADMIN_USER}_key.pem
+
+PASO B: Una vez conectado como '${ADMIN_USER}', ejecuta:
+   sudo bash /opt/vpsfacil/setup.sh
+
+PASO C: En el menú selecciona la opción 3 para continuar."
 echo ""

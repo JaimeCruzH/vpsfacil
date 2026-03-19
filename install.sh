@@ -15,7 +15,7 @@
 set -euo pipefail
 
 REPO_URL="https://github.com/JaimeCruzH/vpsfacil.git"
-REPO_DIR="vpsfacil"
+REPO_DIR="/opt/vpsfacil"
 
 echo ""
 echo -e "\033[1;34m╔══════════════════════════════════════════════════════════════╗\033[0m"
@@ -34,16 +34,19 @@ fi
 
 echo -e "\033[1;32m[✓]\033[0m Git disponible: $(git --version)"
 
-# 2. Clonar o actualizar repositorio
+# 2. Clonar o actualizar repositorio en /opt (accesible por todos los usuarios)
 if [[ -d "$REPO_DIR/.git" ]]; then
     echo -e "\033[1;34m[→]\033[0m Actualizando repositorio existente..."
     git -C "$REPO_DIR" pull --ff-only
 else
-    echo -e "\033[1;34m[→]\033[0m Clonando repositorio VPSfacil..."
+    echo -e "\033[1;34m[→]\033[0m Clonando repositorio VPSfacil en ${REPO_DIR}..."
     git clone "$REPO_URL" "$REPO_DIR"
 fi
 
-echo -e "\033[1;32m[✓]\033[0m Repositorio listo en: $(pwd)/${REPO_DIR}"
+# Permisos: root instala, pero cualquier usuario con sudo puede ejecutarlo
+chmod 755 "$REPO_DIR"
+
+echo -e "\033[1;32m[✓]\033[0m Repositorio listo en: ${REPO_DIR}"
 
 # 3. Ejecutar setup principal
 echo ""
