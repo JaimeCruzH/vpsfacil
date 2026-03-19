@@ -8,7 +8,7 @@
 #   2. Configura N8N con PostgreSQL 16 como base de datos
 #   3. Genera contraseñas seguras automáticamente
 #   4. Despliega N8N + PostgreSQL vía Docker Compose
-#   5. Configura HTTPS con Cloudflare Origin Certificate
+#   5. Configura HTTPS con certificado Let's Encrypt
 #
 # Acceso: https://n8n.vpn.DOMAIN:5678 (solo Tailscale VPN)
 #
