@@ -30,7 +30,7 @@ source "${LIB_DIR}/utils.sh"
 source_config
 
 # ============================================================
-print_header "Paso 6 de 10 — Certificados SSL (Let's Encrypt)"
+print_header "Paso 7 de 10 — Certificados SSL (Let's Encrypt)"
 # ============================================================
 
 check_root

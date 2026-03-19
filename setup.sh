@@ -116,7 +116,7 @@ show_main_menu() {
     echo -e "  ${COLOR_BOLD_GREEN}4)${COLOR_RESET} Instalar Firewall UFW"
     echo -e "  ${COLOR_BOLD_GREEN}5)${COLOR_RESET} Instalar Docker & Docker Compose"
     echo -e "  ${COLOR_BOLD_GREEN}6)${COLOR_RESET} Instalar Tailscale VPN"
-    echo -e "  ${COLOR_BOLD_GREEN}7)${COLOR_RESET} Configurar Certificados SSL (Cloudflare)"
+    echo -e "  ${COLOR_BOLD_GREEN}7)${COLOR_RESET} Configurar Certificados SSL (Let's Encrypt)"
     echo -e "  ${COLOR_BOLD_GREEN}8)${COLOR_RESET} Configurar DNS en Cloudflare"
     echo -e "  ${COLOR_BOLD_GREEN}9)${COLOR_RESET} Instalar Portainer (gestión de contenedores)"
     echo -e "  ${COLOR_BOLD_GREEN}10)${COLOR_RESET} Instalar Kopia Backup"
