@@ -18,7 +18,8 @@ set -euo pipefail
 # CARGAR LIBRERÍAS BASE
 # ============================================================
 # Detectar directorio del script para cargar las librerías
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Usar $0 como fallback si BASH_SOURCE[0] no está disponible (ej: curl | bash)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)" 2>/dev/null || SCRIPT_DIR=""
 
 # Cuando se ejecuta via curl (bash <(curl ...)), BASH_SOURCE[0]
 # es /dev/stdin. En ese caso, descargamos libs desde GitHub.
