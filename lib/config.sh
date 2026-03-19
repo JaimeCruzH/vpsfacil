@@ -181,7 +181,7 @@ _derive_config_vars() {
     # URLs de cada aplicación (via Tailscale VPN)
     export URL_PORTAINER="https://portainer.vpn.${DOMAIN}:9443"
     export URL_N8N="https://n8n.vpn.${DOMAIN}:5678"
-    export URL_FILEBROWSER="https://files.vpn.${DOMAIN}:8080"
+    export URL_FILEBROWSER="http://files.vpn.${DOMAIN}:8080"
     export URL_OPENCLAW="https://openclaw.vpn.${DOMAIN}:18789"
     export URL_KOPIA="https://kopia.vpn.${DOMAIN}:51515"
 

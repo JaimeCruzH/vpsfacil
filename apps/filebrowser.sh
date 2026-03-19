@@ -34,11 +34,6 @@ echo ""
 
 check_docker || { log_error "Docker no está instalado."; exit 1; }
 
-if [[ ! -f "${CERT_FILE}" || ! -f "${CERT_KEY}" ]]; then
-    log_error "Certificados SSL no encontrados. Ejecuta el paso 7 primero."
-    exit 1
-fi
-
 APP_DIR="${APPS_DIR}/filebrowser"
 
 # ============================================================
@@ -79,8 +74,10 @@ log_step "Generando docker-compose.yml"
 COMPOSE_CONTENT=$(cat << EOF
 # ============================================================
 # File Browser — VPSfacil
-# Acceso: https://files.vpn.${DOMAIN}:${PORT_FILEBROWSER}
+# Acceso: http://files.vpn.${DOMAIN}:${PORT_FILEBROWSER}
 # Solo vía Tailscale VPN — Credenciales: admin / admin
+# Nota: HTTP es seguro porque Tailscale cifra todo el tráfico
+#       con WireGuard (no se necesita SSL adicional)
 # ============================================================
 services:
   filebrowser:
@@ -97,15 +94,11 @@ services:
       - ${APP_DIR}/data:/srv/local
       - ${APPS_DIR}:/srv/apps
       - ${ADMIN_HOME}:/srv/home:ro
-      - ${CERT_FILE}:/certs/cert.pem:ro
-      - ${CERT_KEY}:/certs/key.pem:ro
     command: >
       --database /database.db
       --root /srv
       --address 0.0.0.0
       --port 8080
-      --cert /certs/cert.pem
-      --key /certs/key.pem
     networks:
       - vpsfacil-net
 
@@ -154,6 +147,7 @@ windows_instruction "PRIMER ACCESO A FILE BROWSER
 
 2. Abre tu navegador y ve a:
    ${URL_FILEBROWSER}
+   (nota: usa http:// no https://)
 
 3. Ingresa las credenciales por defecto:
    Usuario:    admin
