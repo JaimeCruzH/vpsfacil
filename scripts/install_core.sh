@@ -41,6 +41,12 @@ source "${LIB_DIR}/config.sh"
 source "${LIB_DIR}/utils.sh"
 source "${LIB_DIR}/portainer_api.sh"
 
+# Cargar progreso (download si es remote)
+if [[ ! -f "${LIB_DIR}/progress.sh" ]]; then
+    curl -sSL "${REPO_RAW}/lib/progress.sh" -o "${LIB_DIR}/progress.sh"
+fi
+source "${LIB_DIR}/progress.sh"
+
 # ============================================================
 # CARGAR CONFIGURACIÓN GUARDADA EN FASE A
 # ============================================================
@@ -69,6 +75,11 @@ export CERT_FILE CERT_KEY CERT_CA
 export PORTAINER_ADMIN PORTAINER_PASS KOPIA_PASS
 
 # ============================================================
+# INICIALIZAR PROGRESO
+# ============================================================
+progress_init
+
+# ============================================================
 # VERIFICACIÓN INICIAL
 # ============================================================
 clear
@@ -86,6 +97,10 @@ echo ""
 print_separator
 echo ""
 
+# Mostrar progreso actual (si hay instalación previa)
+progress_show
+wait_for_user "Presiona Enter para continuar..."
+
 # Verificar que NO es root
 if [[ $EUID -eq 0 ]]; then
     log_error "Este script debe ejecutarse como usuario admin, NO como root."
@@ -94,32 +109,50 @@ if [[ $EUID -eq 0 ]]; then
 fi
 
 # ============================================================
-# FUNCIÓN HELPER PARA EJECUTAR SCRIPTS
+# FUNCIÓN HELPER PARA EJECUTAR SCRIPTS CON PROGRESO
 # ============================================================
 run_step() {
     local step_num="$1"
     local script_name="$2"
     local description="$3"
 
+    # Mostrar progreso actual
+    progress_show
+
     echo ""
     log_step "Paso $step_num: $description"
     echo ""
 
+    # Registrar inicio del paso
+    progress_start_step "$step_num"
+
+    # Ejecutar el script
     if [[ "$REMOTE_INSTALL" == "true" ]]; then
         # Descargar script temporalmente desde GitHub
         local REPO_RAW="https://raw.githubusercontent.com/JaimeCruzH/vpsfacil/main"
-        bash <(curl -sSL "${REPO_RAW}/${script_name}")
+        bash <(curl -sSL "${REPO_RAW}/${script_name}") 2>&1
     else
         # Ejecutar script local
-        bash "${REPO_DIR}/${script_name}"
+        bash "${REPO_DIR}/${script_name}" 2>&1
     fi
 
-    if [[ $? -eq 0 ]]; then
+    local exit_code=$?
+
+    if [[ $exit_code -eq 0 ]]; then
         log_success "Paso $step_num completado ✓"
+        progress_complete_step "$step_num"
     else
-        log_error "Paso $step_num falló. Aborting."
+        log_error "Paso $step_num falló con código $exit_code"
+        progress_fail_step "$step_num" "Exit code $exit_code"
+        echo ""
+        log_error "INSTALACIÓN DETENIDA"
+        log_info "El progreso ha sido guardado. Cuando resuelvas el error,"
+        log_info "reconéctate y ejecuta nuevamente: bash ~/install_core.sh"
         exit 1
     fi
+
+    # Mostrar progreso actualizado
+    echo ""
 }
 
 # ============================================================
@@ -140,9 +173,21 @@ run_step 11 "scripts/10_install_filebrowser.sh" "Instalar File Browser"
 # ============================================================
 echo ""
 echo ""
+
+# Mostrar progreso final
+progress_show
+
+# Calcular duración total
+local total_seconds=$(progress_get_total_duration)
+local total_mins=$((total_seconds / 60))
+local total_secs=$((total_seconds % 60))
+
+echo ""
 print_separator
 echo ""
 log_success "¡Instalación Core Completada!"
+echo ""
+echo -e "  ${COLOR_BOLD_WHITE}Tiempo total:${COLOR_RESET}      ${COLOR_CYAN}${total_mins}m ${total_secs}s${COLOR_RESET}"
 echo ""
 echo -e "  ${COLOR_BOLD_WHITE}Acceso a las aplicaciones:${COLOR_RESET}"
 echo -e "    Portainer:    ${COLOR_CYAN}${URL_PORTAINER}${COLOR_RESET}"
@@ -154,8 +199,8 @@ echo -e "    Portainer Usuario:  ${COLOR_CYAN}${PORTAINER_ADMIN}${COLOR_RESET}"
 echo -e "    File Browser:       ${COLOR_CYAN}admin / admin${COLOR_RESET} (sin auth, solo VPN)"
 echo ""
 echo -e "  ${COLOR_BOLD_WHITE}Próximo paso:${COLOR_RESET}"
-echo -e "    Vuelve al menú principal para instalar aplicaciones opcionales:"
-echo -e "    ${COLOR_CYAN}bash setup.sh${COLOR_RESET}"
+echo -e "    Para instalar aplicaciones opcionales (N8N, OpenClaw):"
+echo -e "    ${COLOR_CYAN}bash ~/install_core.sh${COLOR_RESET}"
 echo ""
 print_separator
 echo ""
