@@ -1,10 +1,10 @@
 #!/bin/bash
 # ============================================================
-# apps/filebrowser.sh — Instalar File Browser
+# apps/filebrowser.sh — Instalar File Browser (sin autenticación)
 # VPSfacil - Sistema Automatizado de Instalación en VPS
 #
 # Acceso: http://files.vpn.DOMAIN:8080 (solo Tailscale VPN)
-# Credenciales por defecto: admin / admin
+# Autenticación: DESHABILITADA (VPN es la seguridad)
 # Requisitos: ejecutar como root
 # ============================================================
 
@@ -31,6 +31,8 @@ echo ""
 log_info "Acceso: ${URL_FILEBROWSER}"
 log_info "(requiere Tailscale VPN activo)"
 echo ""
+log_info "Nota: Sin autenticación. VPN proporciona la seguridad."
+echo ""
 
 check_docker || { log_error "Docker no está instalado."; exit 1; }
 
@@ -49,12 +51,6 @@ if docker ps -aq --filter "name=filebrowser" 2>/dev/null | grep -q .; then
     log_success "Contenedor anterior eliminado ✓"
 fi
 
-# Eliminar base de datos para que arranque con admin/admin
-if [[ -f "${APP_DIR}/filebrowser.db" ]]; then
-    rm -f "${APP_DIR}/filebrowser.db"
-    log_success "Base de datos limpiada ✓"
-fi
-
 # ============================================================
 # 2. CREAR ESTRUCTURA DE DIRECTORIOS
 # ============================================================
@@ -64,26 +60,18 @@ mkdir -p "${APP_DIR}/data"
 chown -R "${ADMIN_USER}:${ADMIN_USER}" "$APP_DIR"
 log_success "Directorio: ${APP_DIR} ✓"
 
-# Pre-crear el archivo de base de datos vacío ANTES del bind-mount.
-# Sin este archivo en el host, Docker crea un directorio en su lugar
-# y File Browser no puede abrir el directorio como base de datos.
-touch "${APP_DIR}/filebrowser.db"
-chown "${ADMIN_USER}:${ADMIN_USER}" "${APP_DIR}/filebrowser.db"
-
 # ============================================================
 # 3. PREPARAR Y DESPLEGAR VÍA PORTAINER
 # ============================================================
 log_step "Generando docker-compose.yml"
 
-# IMPORTANTE: se debe incluir --database en el command explícitamente.
-# Si se omite, el command override reemplaza el CMD completo de la imagen
-# (que incluye --database por defecto) y File Browser ignora el bind-mount
-# de la base de datos, arrancando sin usuario admin/admin.
+# --noauth desactiva completamente el login. Seguro porque File Browser
+# solo es accesible desde dentro de la VPN Tailscale.
 COMPOSE_CONTENT=$(cat << EOF
 # ============================================================
-# File Browser — VPSfacil
+# File Browser — VPSfacil (sin autenticación)
 # Acceso: http://files.vpn.${DOMAIN}:${PORT_FILEBROWSER}
-# Solo vía Tailscale VPN — Credenciales: admin / admin
+# Solo vía Tailscale VPN — Sin login requerido
 # Nota: HTTP es seguro porque Tailscale cifra todo el tráfico
 #       con WireGuard (no se necesita SSL adicional)
 # ============================================================
@@ -97,11 +85,10 @@ services:
     ports:
       - "${PORT_FILEBROWSER}:80"
     volumes:
-      - ${APP_DIR}/filebrowser.db:/database/filebrowser.db
       - ${APP_DIR}/data:/srv/local
       - ${APPS_DIR}:/srv/apps
       - ${ADMIN_HOME}:/srv/home:ro
-    command: --database /database/filebrowser.db --root /srv
+    command: --noauth --root /srv
     networks:
       - vpsfacil-net
 
@@ -136,10 +123,10 @@ wait_for_port "localhost" "${PORT_FILEBROWSER}" 60
 log_success "File Browser está corriendo ✓"
 
 # ============================================================
-# INSTRUCCIONES DE PRIMER ACCESO
+# INSTRUCCIONES DE ACCESO
 # ============================================================
 echo ""
-windows_instruction "PRIMER ACCESO A FILE BROWSER
+windows_instruction "ACCESO A FILE BROWSER
 
 1. Activa Tailscale VPN en Windows
 
@@ -147,17 +134,10 @@ windows_instruction "PRIMER ACCESO A FILE BROWSER
    ${URL_FILEBROWSER}
    (nota: usa http:// no https://)
 
-3. Ingresa las credenciales por defecto:
-   Usuario:    admin
-   Contraseña: admin
+3. ¡Listo! Acceso inmediato sin login.
+   La VPN Tailscale proporciona toda la seguridad.
 
-4. Para cambiar usuario y contraseña (recomendado):
-   → Haz clic en el ícono de persona (arriba a la derecha)
-   → Selecciona 'User Management'
-   → Edita el usuario admin
-   → Cambia nombre y contraseña → Guarda
-
-5. Tendrás acceso a:
+4. Tendrás acceso a:
    /apps   → Todas las aplicaciones instaladas
    /home   → Directorio home de ${ADMIN_USER} (solo lectura)
    /local  → Almacenamiento local de File Browser"
@@ -171,10 +151,9 @@ echo ""
 log_success "File Browser instalado exitosamente"
 echo ""
 echo -e "  ${COLOR_BOLD_WHITE}Acceso:${COLOR_RESET}"
-echo -e "    URL:          ${COLOR_CYAN}${URL_FILEBROWSER}${COLOR_RESET}"
-echo -e "    Usuario:      ${COLOR_CYAN}admin${COLOR_RESET}"
-echo -e "    Contraseña:   ${COLOR_CYAN}admin${COLOR_RESET}  ← cambia desde la interfaz web"
-echo -e "    Acceso:       ${COLOR_YELLOW}Solo con Tailscale VPN activo${COLOR_RESET}"
+echo -e "    URL:              ${COLOR_CYAN}${URL_FILEBROWSER}${COLOR_RESET}"
+echo -e "    Autenticación:    ${COLOR_GREEN}Deshabilitada (VPN es la seguridad)${COLOR_RESET}"
+echo -e "    Acceso:           ${COLOR_YELLOW}Solo con Tailscale VPN activo${COLOR_RESET}"
 echo ""
 echo -e "  ${COLOR_BOLD_WHITE}Carpetas accesibles:${COLOR_RESET}"
 echo -e "    /apps  → ${COLOR_CYAN}${APPS_DIR}${COLOR_RESET}"
