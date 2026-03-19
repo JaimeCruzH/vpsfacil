@@ -64,17 +64,9 @@ check_root
 log_step "Verificando usuario ${ADMIN_USER}"
 
 if id "$ADMIN_USER" &>/dev/null; then
-    log_warning "El usuario '${ADMIN_USER}' ya existe en el sistema"
-
-    if confirm "¿Deseas continuar con el usuario existente (sin recrearlo)?"; then
-        log_info "Continuando con usuario existente..."
-        USUARIO_NUEVO=false
-    else
-        log_error "Operación cancelada. El usuario ya existe y elegiste no continuar."
-        log_info  "Si deseas empezar desde cero con este usuario:"
-        log_info  "  userdel -r ${ADMIN_USER}  (CUIDADO: elimina todos sus datos)"
-        exit 1
-    fi
+    log_info "El usuario '${ADMIN_USER}' ya existe en el sistema"
+    log_success "Usando usuario existente ✓"
+    USUARIO_NUEVO=false
 else
     USUARIO_NUEVO=true
 fi
@@ -224,29 +216,30 @@ fi
 chmod 600 "$AUTH_KEYS" "$PRIVATE_KEY" "$PUBLIC_KEY"
 chown -R "${ADMIN_USER}:${ADMIN_USER}" "$SSH_DIR"
 
-# Mostrar la clave privada para que el usuario la guarde
-echo ""
-log_warning "A continuación se mostrará la LLAVE PRIVADA SSH."
-log_warning "Debes copiarla y guardarla en tu PC Windows."
-log_warning "Sin esta llave, no podrás conectarte al servidor."
-echo ""
-wait_for_user "Presiona Enter cuando estés listo para ver la llave privada..."
+# Mostrar la clave privada para que el usuario la guarde (SOLO si es usuario nuevo)
+if [[ "$USUARIO_NUEVO" == "true" ]]; then
+    echo ""
+    log_warning "A continuación se mostrará la LLAVE PRIVADA SSH."
+    log_warning "Debes copiarla y guardarla en tu PC Windows."
+    log_warning "Sin esta llave, no podrás conectarte al servidor."
+    echo ""
+    wait_for_user "Presiona Enter cuando estés listo para ver la llave privada..."
 
-echo ""
-print_separator
-echo -e "${COLOR_BOLD_YELLOW}╔══ LLAVE PRIVADA SSH — COPIA TODO ESTE BLOQUE ══════════════╗${COLOR_RESET}"
-echo -e "${COLOR_BOLD_YELLOW}║ Desde -----BEGIN hasta -----END incluido                   ║${COLOR_RESET}"
-echo -e "${COLOR_BOLD_YELLOW}╚════════════════════════════════════════════════════════════╝${COLOR_RESET}"
-echo ""
-cat "$PRIVATE_KEY"
-echo ""
-print_separator
+    echo ""
+    print_separator
+    echo -e "${COLOR_BOLD_YELLOW}╔══ LLAVE PRIVADA SSH — COPIA TODO ESTE BLOQUE ══════════════╗${COLOR_RESET}"
+    echo -e "${COLOR_BOLD_YELLOW}║ Desde -----BEGIN hasta -----END incluido                   ║${COLOR_RESET}"
+    echo -e "${COLOR_BOLD_YELLOW}╚════════════════════════════════════════════════════════════╝${COLOR_RESET}"
+    echo ""
+    cat "$PRIVATE_KEY"
+    echo ""
+    print_separator
 
-# ============================================================
-# 6. INSTRUCCIONES PARA BITVISE (Windows)
-# ============================================================
-echo ""
-windows_instruction "CÓMO GUARDAR LA LLAVE SSH EN TU PC WINDOWS
+    # ============================================================
+    # 6. INSTRUCCIONES PARA BITVISE (Windows)
+    # ============================================================
+    echo ""
+    windows_instruction "CÓMO GUARDAR LA LLAVE SSH EN TU PC WINDOWS
 
 1. Copia TODO el texto de la llave privada que ves arriba
    (desde -----BEGIN RSA PRIVATE KEY----- hasta -----END RSA PRIVATE KEY-----)
@@ -294,6 +287,13 @@ log_info "Si ves el mensaje 'Conexion exitosa', vuelve aquí y continúa."
 echo ""
 
 wait_for_user "Presiona Enter cuando hayas verificado la conexión con '${ADMIN_USER}'..."
+else
+    # Usuario ya existía — mostrar resumen rápido
+    echo ""
+    log_success "Usuario '${ADMIN_USER}' verificado y configurado correctamente ✓"
+    log_info "El usuario ya tiene acceso SSH configurado."
+    echo ""
+fi
 
 # ============================================================
 # 8. GUARDAR CONFIGURACIÓN EN HOME DEL NUEVO USUARIO
