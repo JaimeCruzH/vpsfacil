@@ -687,8 +687,14 @@ run_phase_script() {
         fi
         bash "$script_path"
     else
-        # Ejecución remota — descargar desde GitHub
-        bash <(curl -sSL "${REPO_RAW}/scripts/${script_name}?v=$(date +%s)")
+        # Ejecución remota — descargar a archivo temporal y ejecutar
+        local tmp_script
+        tmp_script=$(mktemp)
+        curl -sSL "${REPO_RAW}/scripts/${script_name}?v=$(date +%s)" > "$tmp_script"
+        bash "$tmp_script"
+        local exit_code=$?
+        rm -f "$tmp_script"
+        return $exit_code
     fi
 }
 
