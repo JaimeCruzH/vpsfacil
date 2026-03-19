@@ -171,15 +171,9 @@ prompt_password() {
 wait_for_user() {
     local mensaje="${1:-Presiona Enter para continuar...}"
     echo ""
-    printf "%b%s" "${PREFIX_PROMPT} " "${mensaje}"
-    # Leer desde stdin, con fallback a /dev/tty si es necesario
-    if read -r -t 0; then
-        read -r
-    elif [[ -t 0 ]]; then
-        read -r
-    else
-        read -r < /dev/tty 2>/dev/null || sleep 1
-    fi
+    printf "%b%s\n" "${PREFIX_PROMPT} ${mensaje}"
+    # Leer entrada del usuario (bloquea hasta que presione Enter)
+    read -r < /dev/tty || read -r
     echo ""
 }
 
