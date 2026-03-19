@@ -131,10 +131,12 @@ prompt_input() {
     local default="${2:-}"
     local respuesta
 
+    # >&2 para que el prompt se muestre en pantalla aunque la función
+    # se llame dentro de $(...) donde stdout está capturado
     if [[ -n "$default" ]]; then
-        echo -ne "${PREFIX_PROMPT} ${prompt} ${COLOR_CYAN}[${default}]${COLOR_RESET}: "
+        echo -ne "${PREFIX_PROMPT} ${prompt} ${COLOR_CYAN}[${default}]${COLOR_RESET}: " >&2
     else
-        echo -ne "${PREFIX_PROMPT} ${prompt}: "
+        echo -ne "${PREFIX_PROMPT} ${prompt}: " >&2
     fi
 
     read -r respuesta
@@ -153,10 +155,11 @@ prompt_password() {
     local prompt="$1"
     local pass
 
-    echo -ne "${PREFIX_PROMPT} ${prompt}: "
+    # >&2 para que el prompt sea visible aunque se llame dentro de $(...)
+    echo -ne "${PREFIX_PROMPT} ${prompt}: " >&2
     read -rs pass
     pass="${pass//$'\r'/}"  # strip CRLF artifacts
-    echo ""
+    echo "" >&2
     echo "$pass"
 }
 
