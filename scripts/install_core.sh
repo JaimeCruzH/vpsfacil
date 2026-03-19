@@ -105,10 +105,13 @@ collect_all_inputs() {
     echo ""
     log_info "Resumen de configuración:"
     echo ""
-    echo -e "   ${COLOR_BOLD_WHITE}Dominio:${COLOR_RESET}           ${COLOR_CYAN}${DOMAIN}${COLOR_RESET}"
-    echo -e "   ${COLOR_BOLD_WHITE}Usuario admin:${COLOR_RESET}      ${COLOR_CYAN}${ADMIN_USER}${COLOR_RESET}"
-    echo -e "   ${COLOR_BOLD_WHITE}Zona horaria:${COLOR_RESET}       ${COLOR_CYAN}${TIMEZONE}${COLOR_RESET}"
-    echo ""
+    # Mostrar configuración básica solo si está disponible
+    if [[ -n "${DOMAIN:-}" ]]; then
+        echo -e "   ${COLOR_BOLD_WHITE}Dominio:${COLOR_RESET}           ${COLOR_CYAN}${DOMAIN}${COLOR_RESET}"
+        echo -e "   ${COLOR_BOLD_WHITE}Usuario admin:${COLOR_RESET}      ${COLOR_CYAN}${ADMIN_USER}${COLOR_RESET}"
+        echo -e "   ${COLOR_BOLD_WHITE}Zona horaria:${COLOR_RESET}       ${COLOR_CYAN}${TIMEZONE}${COLOR_RESET}"
+        echo ""
+    fi
     echo -e "   ${COLOR_BOLD_WHITE}Portainer:${COLOR_RESET}"
     echo -e "     Usuario:     ${COLOR_CYAN}${PORTAINER_ADMIN}${COLOR_RESET}"
     echo -e "     Contraseña:  ●●●●●●●●"
