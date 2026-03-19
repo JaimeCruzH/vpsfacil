@@ -156,6 +156,29 @@ log_success "Arquitectura: ${ARCH} ✓"
 log_step "Actualizando lista de paquetes del sistema"
 log_info "Esto puede tomar unos minutos dependiendo de la velocidad del servidor..."
 
+# Esperar que terminen procesos apt automáticos del sistema
+_wait_apt_lock() {
+    local locks=("/var/lib/dpkg/lock-frontend" "/var/lib/dpkg/lock" "/var/cache/apt/archives/lock")
+    local waited=0 shown=0
+    while true; do
+        local busy=false
+        for lock in "${locks[@]}"; do
+            fuser "$lock" >/dev/null 2>&1 && busy=true && break
+        done
+        [[ "$busy" == "false" ]] && break
+        if [[ $shown -eq 0 ]]; then
+            log_warning "Sistema ejecutando actualizaciones automáticas, esperando..."
+            shown=1
+        fi
+        printf "."
+        sleep 3
+        waited=$((waited + 3))
+        [[ $waited -ge 300 ]] && echo "" && log_error "Timeout esperando apt lock" && exit 1
+    done
+    [[ $shown -eq 1 ]] && echo "" && log_success "Sistema libre ✓"
+}
+_wait_apt_lock
+
 apt-get update -q 2>&1 | tail -3
 
 log_success "Lista de paquetes actualizada ✓"
