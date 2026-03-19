@@ -180,8 +180,8 @@ confirm() {
     local respuesta
 
     while true; do
-        echo -ne "${PREFIX_PROMPT} ${prompt} ${COLOR_BOLD_WHITE}(sí/no)${COLOR_RESET}: "
-        read -r respuesta
+        echo -ne "${PREFIX_PROMPT} ${prompt} ${COLOR_BOLD_WHITE}(sí/no)${COLOR_RESET}: " >&2
+        read -r respuesta < /dev/tty
         respuesta="${respuesta//$'\r'/}"
         case "${respuesta,,}" in
             si|sí|s|yes|y) return 0 ;;
@@ -202,7 +202,7 @@ prompt_input() {
         echo -ne "${PREFIX_PROMPT} ${prompt}: " >&2
     fi
 
-    read -r respuesta
+    read -r respuesta < /dev/tty
     respuesta="${respuesta//$'\r'/}"
 
     if [[ -z "$respuesta" && -n "$default" ]]; then
@@ -217,7 +217,7 @@ prompt_password() {
     local pass
 
     echo -ne "${PREFIX_PROMPT} ${prompt}: " >&2
-    read -rs pass
+    read -rs pass < /dev/tty
     pass="${pass//$'\r'/}"
     echo "" >&2
     echo "$pass"
@@ -226,9 +226,9 @@ prompt_password() {
 wait_for_user() {
     local mensaje="${1:-Presiona Enter para continuar...}"
     echo ""
-    echo -ne "${PREFIX_PROMPT} ${mensaje}"
-    read -r
-    echo ""
+    echo -ne "${PREFIX_PROMPT} ${mensaje}" >&2
+    read -r < /dev/tty
+    echo "" >&2
 }
 
 get_app_dir() {
