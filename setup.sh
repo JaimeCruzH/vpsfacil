@@ -182,10 +182,12 @@ confirm() {
     while true; do
         echo -ne "${PREFIX_PROMPT} ${prompt} ${COLOR_BOLD_WHITE}(sí/no)${COLOR_RESET}: " >&2
         read -r respuesta < /dev/tty
-        respuesta="${respuesta//$'\r'/}"
+        # Limpiar espacios y retornos de carro
+        respuesta="$(echo "$respuesta" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
         case "${respuesta,,}" in
             si|sí|s|yes|y) return 0 ;;
             no|n)           return 1 ;;
+            "") ;; # Input vacío - mostrar advertencia
             *) log_warning "Por favor responde 'sí' o 'no'" ;;
         esac
     done
@@ -203,7 +205,8 @@ prompt_input() {
     fi
 
     read -r respuesta < /dev/tty
-    respuesta="${respuesta//$'\r'/}"
+    # Limpiar espacios en blanco al inicio y final
+    respuesta="$(echo "$respuesta" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
 
     if [[ -z "$respuesta" && -n "$default" ]]; then
         echo "$default"
@@ -218,7 +221,8 @@ prompt_password() {
 
     echo -ne "${PREFIX_PROMPT} ${prompt}: " >&2
     read -rs pass < /dev/tty
-    pass="${pass//$'\r'/}"
+    # Limpiar espacios en blanco al inicio y final
+    pass="$(echo "$pass" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
     echo "" >&2
     echo "$pass"
 }

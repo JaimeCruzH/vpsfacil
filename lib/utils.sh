@@ -113,12 +113,14 @@ confirm() {
     local respuesta
 
     while true; do
-        echo -ne "${PREFIX_PROMPT} ${prompt} ${COLOR_BOLD_WHITE}(sí/no)${COLOR_RESET}: "
-        read -r respuesta
-        respuesta="${respuesta//$'\r'/}"  # strip CRLF artifacts
+        echo -ne "${PREFIX_PROMPT} ${prompt} ${COLOR_BOLD_WHITE}(sí/no)${COLOR_RESET}: " >&2
+        read -r respuesta < /dev/tty
+        # Limpiar espacios en blanco al inicio y final
+        respuesta="$(echo "$respuesta" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
         case "${respuesta,,}" in
             si|sí|s|yes|y) return 0 ;;
             no|n)           return 1 ;;
+            "") ;; # Input vacío - mostrar advertencia
             *) log_warning "Por favor responde 'sí' o 'no'" ;;
         esac
     done
@@ -139,8 +141,9 @@ prompt_input() {
         echo -ne "${PREFIX_PROMPT} ${prompt}: " >&2
     fi
 
-    read -r respuesta
-    respuesta="${respuesta//$'\r'/}"  # strip CRLF artifacts
+    read -r respuesta < /dev/tty
+    # Limpiar espacios en blanco al inicio y final
+    respuesta="$(echo "$respuesta" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
 
     if [[ -z "$respuesta" && -n "$default" ]]; then
         echo "$default"
@@ -157,8 +160,9 @@ prompt_password() {
 
     # >&2 para que el prompt sea visible aunque se llame dentro de $(...)
     echo -ne "${PREFIX_PROMPT} ${prompt}: " >&2
-    read -rs pass
-    pass="${pass//$'\r'/}"  # strip CRLF artifacts
+    read -rs pass < /dev/tty
+    # Limpiar espacios en blanco al inicio y final
+    pass="$(echo "$pass" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
     echo "" >&2
     echo "$pass"
 }
