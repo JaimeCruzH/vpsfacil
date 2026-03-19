@@ -12,17 +12,19 @@
 #   - Ejecutar como root
 # ============================================================
 
-set -euo pipefail
-
 # ============================================================
 # CARGAR LIBRERÍAS BASE
 # ============================================================
 # Detectar directorio del script para cargar las librerías
-# Usar $0 como fallback si BASH_SOURCE[0] no está disponible (ej: curl | bash)
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)" 2>/dev/null || SCRIPT_DIR=""
+# Manejar el caso donde se ejecuta vía curl | bash (BASH_SOURCE[0] puede estar vacío)
+if [[ -n "${BASH_SOURCE[0]:-}" && "$BASH_SOURCE[0]" != "/dev/stdin" ]]; then
+    SCRIPT_DIR="$(cd "$(dirname "$BASH_SOURCE[0]")" && pwd)"
+else
+    SCRIPT_DIR=""
+fi
 
-# Cuando se ejecuta via curl (bash <(curl ...)), BASH_SOURCE[0]
-# es /dev/stdin. En ese caso, descargamos libs desde GitHub.
+# Cuando se ejecuta via curl (bash <(curl ...)), SCRIPT_DIR estará vacío.
+# En ese caso, descargamos libs desde GitHub.
 if [[ "$SCRIPT_DIR" == "" || "$SCRIPT_DIR" == "/dev/fd" || "$SCRIPT_DIR" == "/proc/"* ]]; then
     # Ejecución via curl — descargar librerías temporalmente
     REPO_RAW="https://raw.githubusercontent.com/JaimeCruzH/vpsfacil/main"
@@ -49,6 +51,9 @@ source "${LIB_DIR}/config.sh"
 source "${LIB_DIR}/utils.sh"
 # shellcheck source=lib/install_prompts.sh
 source "${LIB_DIR}/install_prompts.sh"
+
+# Ahora que las librerías están cargadas, habilitar strict mode
+set -euo pipefail
 
 # ============================================================
 # VERIFICACIÓN INICIAL
