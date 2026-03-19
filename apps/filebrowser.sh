@@ -190,16 +190,20 @@ sleep 10
 # Usamos la API para renombrar ese usuario y cambiar su contraseña
 log_process "Autenticando con credenciales por defecto (admin/admin)..."
 
-FB_TOKEN=$(curl -sk -X POST "https://localhost:${PORT_FILEBROWSER}/api/login" \
+# Capturar respuesta en variable separada para que jq no falle el script
+# bajo set -euo pipefail cuando el output no sea JSON válido
+FB_LOGIN_RESP=$(curl -sk -X POST "https://localhost:${PORT_FILEBROWSER}/api/login" \
     -H "Content-Type: application/json" \
-    -d '{"username":"admin","password":"admin","recaptcha":""}' 2>/dev/null | \
-    jq -r '.token // ""' 2>/dev/null)
+    -d '{"username":"admin","password":"admin","recaptcha":""}' 2>/dev/null) || true
+
+FB_TOKEN=$(echo "$FB_LOGIN_RESP" | jq -r '.token // ""' 2>/dev/null) || true
 
 if [[ -n "$FB_TOKEN" ]]; then
     # Obtener ID del usuario admin (normalmente es 1)
-    ADMIN_ID=$(curl -sk -X GET "https://localhost:${PORT_FILEBROWSER}/api/users" \
-        -H "X-Auth: ${FB_TOKEN}" 2>/dev/null | \
-        jq -r '.[0].id // 1' 2>/dev/null)
+    FB_USERS_RESP=$(curl -sk -X GET "https://localhost:${PORT_FILEBROWSER}/api/users" \
+        -H "X-Auth: ${FB_TOKEN}" 2>/dev/null) || true
+    ADMIN_ID=$(echo "$FB_USERS_RESP" | jq -r '.[0].id // 1' 2>/dev/null) || true
+    ADMIN_ID="${ADMIN_ID:-1}"
 
     # Actualizar usuario: cambiar nombre y contraseña
     UPDATE_BODY=$(jq -n \
@@ -224,7 +228,7 @@ if [[ -n "$FB_TOKEN" ]]; then
         -X PUT "https://localhost:${PORT_FILEBROWSER}/api/users/${ADMIN_ID}" \
         -H "X-Auth: ${FB_TOKEN}" \
         -H "Content-Type: application/json" \
-        -d "$UPDATE_BODY" 2>/dev/null)
+        -d "$UPDATE_BODY" 2>/dev/null) || true
 
     if [[ "$HTTP_STATUS" == "200" ]]; then
         log_success "Usuario '${FB_USER}' configurado correctamente ✓"
@@ -235,8 +239,8 @@ if [[ -n "$FB_TOKEN" ]]; then
     fi
 else
     log_warning "No se pudo autenticar con File Browser."
-    log_info    "Es posible que las credenciales por defecto ya hayan cambiado."
-    log_info    "Accede a ${URL_FILEBROWSER} y usa: admin / admin"
+    log_info    "Accede a ${URL_FILEBROWSER} con: admin / admin"
+    log_info    "Luego cambia las credenciales en Settings → User Management"
 fi
 
 # ============================================================
