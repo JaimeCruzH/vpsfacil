@@ -47,22 +47,9 @@ fi
 source "${LIB_DIR}/progress.sh"
 
 # ============================================================
-# FUNCIÓN: Recolectar datos para FASE B (si no vienen de setup.sh)
+# FUNCIÓN: Recolectar credenciales de FASE B
 # ============================================================
-collect_all_inputs() {
-    local config_file="/tmp/vpsfacil_install.conf"
-
-    clear
-    print_banner
-    echo ""
-    print_header "Instalación Automática - Recolección de Datos"
-    echo ""
-    log_info "Se harán todas las preguntas ahora. Después, la instalación"
-    log_info "correrá sin interrupciones hasta completarse."
-    echo ""
-    print_separator
-    echo ""
-
+collect_phase_b_credentials() {
     log_step "Credenciales de Portainer"
     echo ""
     log_info "Usuario administrador de Portainer (será creado automáticamente):"
@@ -103,15 +90,8 @@ collect_all_inputs() {
 
     print_separator
     echo ""
-    log_info "Resumen de configuración:"
+    log_info "Resumen de credenciales:"
     echo ""
-    # Mostrar configuración básica solo si está disponible
-    if [[ -n "${DOMAIN:-}" ]]; then
-        echo -e "   ${COLOR_BOLD_WHITE}Dominio:${COLOR_RESET}           ${COLOR_CYAN}${DOMAIN}${COLOR_RESET}"
-        echo -e "   ${COLOR_BOLD_WHITE}Usuario admin:${COLOR_RESET}      ${COLOR_CYAN}${ADMIN_USER}${COLOR_RESET}"
-        echo -e "   ${COLOR_BOLD_WHITE}Zona horaria:${COLOR_RESET}       ${COLOR_CYAN}${TIMEZONE}${COLOR_RESET}"
-        echo ""
-    fi
     echo -e "   ${COLOR_BOLD_WHITE}Portainer:${COLOR_RESET}"
     echo -e "     Usuario:     ${COLOR_CYAN}${PORTAINER_ADMIN}${COLOR_RESET}"
     echo -e "     Contraseña:  ●●●●●●●●"
@@ -124,37 +104,9 @@ collect_all_inputs() {
 
     if ! confirm "¿Es correcta esta configuración?"; then
         log_info "Volviendo atrás..."
-        collect_all_inputs
+        collect_phase_b_credentials
         return
     fi
-
-    cat > "$config_file" << EOF
-# ============================================================
-# Configuración de Instalación Automática - VPSfacil
-# Generado automáticamente por install_core.sh
-# NO editar manualmente
-# ============================================================
-
-# Configuración básica
-DOMAIN="${DOMAIN}"
-ADMIN_USER="${ADMIN_USER}"
-TIMEZONE="${TIMEZONE}"
-INSTALLATION_DATE="$(date '+%Y-%m-%d')"
-
-# Credenciales Portainer
-PORTAINER_ADMIN="${PORTAINER_ADMIN}"
-PORTAINER_PASS="${PORTAINER_PASS}"
-
-# Contraseña Kopia
-KOPIA_PASS="${KOPIA_PASS}"
-
-# Bandera para install_core.sh
-INSTALLATION_MODE="automatic"
-EOF
-
-    chmod 644 "$config_file"
-    log_success "Configuración guardada en: $config_file ✓"
-    echo ""
 }
 
 # ============================================================
@@ -172,20 +124,27 @@ elif [[ -f "/root/setup.conf" ]]; then
 fi
 
 if [[ -z "$CONFIG_FILE" ]]; then
-    log_info "No se encontró configuración previa. Recolectando datos..."
-    echo ""
-    collect_all_inputs
-    CONFIG_FILE="/tmp/vpsfacil_install.conf"
+    log_error "No se encontró configuración de FASE A."
+    log_error "Ejecuta primero: bash ~/setup.sh"
+    exit 1
 fi
 
 # Cargar configuración
 source "$CONFIG_FILE"
 
-# Si no tenemos credenciales de Portainer, pedir ahora (FASE B siempre necesita esto)
+# Pedir credenciales si no existen
 if [[ -z "${PORTAINER_ADMIN:-}" ]]; then
-    log_info "Recolectando credenciales de instalación..."
+    clear
+    print_banner
     echo ""
-    collect_all_inputs
+    print_header "FASE B: Recolección de Credenciales"
+    echo ""
+    log_info "Se harán todas las preguntas ahora. Después, la instalación"
+    log_info "correrá sin interrupciones hasta completarse."
+    echo ""
+    print_separator
+    echo ""
+    collect_phase_b_credentials
 fi
 
 # Derivar variables adicionales
