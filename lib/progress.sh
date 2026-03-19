@@ -130,7 +130,7 @@ progress_show() {
 
     local completed_steps=""
     if [[ -f "$PROGRESS_LOG" ]]; then
-        completed_steps=$(grep "STATUS=completado" "$PROGRESS_LOG" | cut -d'|' -f1 | cut -d'=' -f2 | tr '\n' ' ')
+        completed_steps=$(grep "STATUS=completado" "$PROGRESS_LOG" | cut -d'|' -f1 | cut -d'=' -f2 | tr '\n' ' ' || true)
         completed_count=$(echo "$completed_steps" | wc -w)
     fi
 
@@ -169,7 +169,7 @@ progress_show() {
         # Buscar si el paso está completado
         if [[ " $completed_steps " =~ " $step_num " ]]; then
             status="✓"
-            local duration=$(grep "^PASO=$step_num|" "$PROGRESS_LOG" | grep "STATUS=completado" | tail -1 | grep -o "DURACION=[^|]*" | cut -d'=' -f2)
+            local duration=$(grep "^PASO=$step_num|" "$PROGRESS_LOG" 2>/dev/null | grep "STATUS=completado" 2>/dev/null | tail -1 | grep -o "DURACION=[^|]*" 2>/dev/null | cut -d'=' -f2 || echo "")
             info="[completado en $duration]"
         fi
 
