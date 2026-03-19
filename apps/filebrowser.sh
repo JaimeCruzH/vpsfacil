@@ -3,16 +3,8 @@
 # apps/filebrowser.sh — Instalar File Browser
 # VPSfacil - Sistema Automatizado de Instalación en VPS
 #
-# Qué hace este script:
-#   1. Crea estructura de directorios para File Browser
-#   2. Despliega File Browser vía Docker con HTTPS
-#   3. Muestra instrucciones para el primer acceso
-#
-# Credenciales por defecto: admin / admin
-# El usuario las cambia desde la interfaz web.
-#
 # Acceso: https://files.vpn.DOMAIN:8080 (solo Tailscale VPN)
-#
+# Credenciales por defecto: admin / admin
 # Requisitos: ejecutar como root
 # ============================================================
 
@@ -36,7 +28,6 @@ log_info "File Browser es un gestor de archivos web que permite"
 log_info "ver, editar, subir y descargar archivos del servidor"
 log_info "desde tu navegador con una interfaz moderna."
 echo ""
-log_info "Tendrás acceso a: ${APPS_DIR}/"
 log_info "Acceso: ${URL_FILEBROWSER}"
 log_info "(requiere Tailscale VPN activo)"
 echo ""
@@ -48,67 +39,48 @@ if [[ ! -f "${CERT_FILE}" || ! -f "${CERT_KEY}" ]]; then
     exit 1
 fi
 
-# ============================================================
-# 1. CREAR ESTRUCTURA DE DIRECTORIOS
-# ============================================================
-log_step "Creando estructura de directorios"
-
 APP_DIR="${APPS_DIR}/filebrowser"
-mkdir -p "${APP_DIR}/config"
-mkdir -p "${APP_DIR}/data"
-chown -R "${ADMIN_USER}:${ADMIN_USER}" "$APP_DIR"
-log_success "Directorio: ${APP_DIR} ✓"
 
 # ============================================================
-# 2. LIMPIAR INSTALACIÓN ANTERIOR (si existe)
+# 1. LIMPIAR INSTALACIÓN ANTERIOR
 # ============================================================
-# Detener contenedor existente para liberar el archivo de base de datos
-if docker ps -q --filter "name=filebrowser" 2>/dev/null | grep -q .; then
+log_step "Preparando instalación limpia"
+
+# Detener y eliminar contenedor anterior
+if docker ps -aq --filter "name=filebrowser" 2>/dev/null | grep -q .; then
     log_process "Deteniendo contenedor anterior..."
     docker stop filebrowser 2>/dev/null || true
     docker rm   filebrowser 2>/dev/null || true
+    log_success "Contenedor anterior eliminado ✓"
 fi
 
-# Eliminar base de datos anterior para que File Browser inicie con admin/admin
-if [[ -f "${APP_DIR}/config/filebrowser.db" ]]; then
-    log_process "Eliminando base de datos anterior (restaurando credenciales por defecto)..."
-    rm -f "${APP_DIR}/config/filebrowser.db"
+# Eliminar base de datos para que arranque con admin/admin
+if [[ -f "${APP_DIR}/filebrowser.db" ]]; then
+    rm -f "${APP_DIR}/filebrowser.db"
     log_success "Base de datos limpiada ✓"
 fi
 
 # ============================================================
-# 2. CREAR CONFIGURACIÓN DE FILE BROWSER
+# 2. CREAR ESTRUCTURA DE DIRECTORIOS
 # ============================================================
-log_step "Creando configuración"
+log_step "Creando estructura de directorios"
 
-cat > "${APP_DIR}/config/filebrowser.json" << EOF
-{
-  "port": 8080,
-  "baseURL": "",
-  "address": "0.0.0.0",
-  "log": "stdout",
-  "database": "/config/filebrowser.db",
-  "root": "/srv",
-  "cert": "/certs/cert.pem",
-  "key": "/certs/key.pem",
-  "noAuth": false
-}
-EOF
-
-chown -R "${ADMIN_USER}:${ADMIN_USER}" "${APP_DIR}/config"
-log_success "Configuración creada ✓"
+mkdir -p "${APP_DIR}/data"
+chown -R "${ADMIN_USER}:${ADMIN_USER}" "$APP_DIR"
+log_success "Directorio: ${APP_DIR} ✓"
 
 # ============================================================
 # 3. PREPARAR Y DESPLEGAR VÍA PORTAINER
 # ============================================================
 log_step "Generando docker-compose.yml"
 
+# La base de datos se monta directamente como archivo en /database.db
+# (ubicación por defecto del contenedor oficial de File Browser)
 COMPOSE_CONTENT=$(cat << EOF
 # ============================================================
 # File Browser — VPSfacil
 # Acceso: https://files.vpn.${DOMAIN}:${PORT_FILEBROWSER}
-# Solo vía Tailscale VPN
-# Credenciales por defecto: admin / admin
+# Solo vía Tailscale VPN — Credenciales: admin / admin
 # ============================================================
 services:
   filebrowser:
@@ -121,13 +93,19 @@ services:
     ports:
       - "${PORT_FILEBROWSER}:8080"
     volumes:
-      - ${APP_DIR}/config:/config
+      - ${APP_DIR}/filebrowser.db:/database.db
       - ${APP_DIR}/data:/srv/local
       - ${APPS_DIR}:/srv/apps
       - ${ADMIN_HOME}:/srv/home:ro
       - ${CERT_FILE}:/certs/cert.pem:ro
       - ${CERT_KEY}:/certs/key.pem:ro
-    command: --config /config/filebrowser.json
+    command: >
+      --database /database.db
+      --root /srv
+      --address 0.0.0.0
+      --port 8080
+      --cert /certs/cert.pem
+      --key /certs/key.pem
     networks:
       - vpsfacil-net
 
@@ -140,6 +118,11 @@ EOF
 echo "$COMPOSE_CONTENT" > "${APP_DIR}/docker-compose.yml"
 chown "${ADMIN_USER}:${ADMIN_USER}" "${APP_DIR}/docker-compose.yml"
 log_success "docker-compose.yml generado ✓"
+
+# Crear archivo vacío para la base de datos ANTES de montar
+# (evita que Docker lo cree como directorio)
+touch "${APP_DIR}/filebrowser.db"
+chown "${ADMIN_USER}:${ADMIN_USER}" "${APP_DIR}/filebrowser.db"
 
 # ============================================================
 # 4. DESPLEGAR
@@ -177,10 +160,10 @@ windows_instruction "PRIMER ACCESO A FILE BROWSER
    Contraseña: admin
 
 4. Para cambiar usuario y contraseña (recomendado):
-   → Haz clic en tu nombre (arriba a la derecha)
+   → Haz clic en el ícono de persona (arriba a la derecha)
    → Selecciona 'User Management'
-   → Edita el usuario admin: cambia nombre y contraseña
-   → Guarda los cambios
+   → Edita el usuario admin
+   → Cambia nombre y contraseña → Guarda
 
 5. Tendrás acceso a:
    /apps   → Todas las aplicaciones instaladas
@@ -198,7 +181,7 @@ echo ""
 echo -e "  ${COLOR_BOLD_WHITE}Acceso:${COLOR_RESET}"
 echo -e "    URL:          ${COLOR_CYAN}${URL_FILEBROWSER}${COLOR_RESET}"
 echo -e "    Usuario:      ${COLOR_CYAN}admin${COLOR_RESET}"
-echo -e "    Contraseña:   ${COLOR_CYAN}admin${COLOR_RESET} (cambia desde la interfaz web)"
+echo -e "    Contraseña:   ${COLOR_CYAN}admin${COLOR_RESET}  ← cambia desde la interfaz web"
 echo -e "    Acceso:       ${COLOR_YELLOW}Solo con Tailscale VPN activo${COLOR_RESET}"
 echo ""
 echo -e "  ${COLOR_BOLD_WHITE}Carpetas accesibles:${COLOR_RESET}"
