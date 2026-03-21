@@ -444,10 +444,28 @@ EOF
     echo -e "    URL:     ${COLOR_CYAN}http://openclaw.vpn.${DOMAIN}:${PORT_OPENCLAW_WS}${COLOR_RESET}"
     echo -e "    Token:   ${COLOR_CYAN}${GATEWAY_TOKEN}${COLOR_RESET}"
     echo ""
-    echo -e "  ${COLOR_BOLD_WHITE}Configuración inicial (en el servidor):${COLOR_RESET}"
-    echo -e "    ${COLOR_CYAN}docker exec -it openclaw node openclaw.mjs onboard${COLOR_RESET}"
-    echo ""
     echo -e "  ${COLOR_BOLD_WHITE}Directorio:${COLOR_RESET}  ${COLOR_CYAN}${APP_DIR}${COLOR_RESET}"
+    echo ""
+    print_separator
+
+    # ── Onboarding ────────────────────────────────────────────
+    echo ""
+    log_info "El siguiente paso es el onboarding de OpenClaw."
+    log_info "Te guiará para conectar tus plataformas de mensajería"
+    log_info "(WhatsApp, Telegram, Slack, Discord, etc.)."
+    echo ""
+    if confirm "¿Deseas ejecutar el onboarding ahora?"; then
+        echo ""
+        log_process "Iniciando onboarding de OpenClaw..."
+        echo ""
+        docker exec -it openclaw node openclaw.mjs onboard
+        echo ""
+        log_success "Onboarding completado."
+    else
+        echo ""
+        log_info "Puedes ejecutarlo más tarde con:"
+        log_info "  docker exec -it openclaw node openclaw.mjs onboard"
+    fi
     echo ""
 
     wait_for_user "Presiona Enter para volver al menú..."
