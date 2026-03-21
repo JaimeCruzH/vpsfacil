@@ -34,6 +34,7 @@ source "${LIB_DIR}/colors.sh"
 source "${LIB_DIR}/config.sh"
 source "${LIB_DIR}/utils.sh"
 source_config
+source "${LIB_DIR}/portainer_api.sh" 2>/dev/null || true
 
 # ============================================================
 print_header "Paso 10 de 11 — Instalar File Browser"
@@ -140,26 +141,6 @@ wait_for_port "localhost" "${PORT_FILEBROWSER}" 60
 log_success "File Browser está corriendo ✓"
 
 # ============================================================
-# INSTRUCCIONES DE ACCESO
-# ============================================================
-echo ""
-windows_instruction "ACCESO A FILE BROWSER
-
-1. Activa Tailscale VPN en Windows
-
-2. Abre tu navegador y ve a:
-   ${URL_FILEBROWSER}
-   (nota: usa http:// no https://)
-
-3. ¡Listo! Acceso inmediato sin login.
-   La VPN Tailscale proporciona toda la seguridad.
-
-4. Tendrás acceso a:
-   /apps   → Todas las aplicaciones instaladas
-   /home   → Directorio home de ${ADMIN_USER} (solo lectura)
-   /local  → Almacenamiento local de File Browser"
-
-# ============================================================
 # RESUMEN
 # ============================================================
 echo ""
@@ -167,14 +148,5 @@ print_separator
 echo ""
 log_success "File Browser instalado exitosamente"
 echo ""
-echo -e "  ${COLOR_BOLD_WHITE}Acceso:${COLOR_RESET}"
-echo -e "    URL:              ${COLOR_CYAN}${URL_FILEBROWSER}${COLOR_RESET}"
-echo -e "    Autenticación:    ${COLOR_GREEN}Deshabilitada (VPN es la seguridad)${COLOR_RESET}"
-echo -e "    Acceso:           ${COLOR_YELLOW}Solo con Tailscale VPN activo${COLOR_RESET}"
-echo ""
-echo -e "  ${COLOR_BOLD_WHITE}Carpetas accesibles:${COLOR_RESET}"
-echo -e "    /apps  → ${COLOR_CYAN}${APPS_DIR}${COLOR_RESET}"
-echo -e "    /home  → ${COLOR_CYAN}${ADMIN_HOME}${COLOR_RESET} (solo lectura)"
-echo ""
-echo -e "  ${COLOR_BOLD_WHITE}Directorio:${COLOR_RESET}  ${COLOR_CYAN}${APP_DIR}${COLOR_RESET}"
+log_info "Las instrucciones de acceso se mostrarán al final de la instalación."
 echo ""

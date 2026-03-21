@@ -43,6 +43,7 @@ source "${LIB_DIR}/colors.sh"
 source "${LIB_DIR}/config.sh"
 source "${LIB_DIR}/utils.sh"
 source_config
+source "${LIB_DIR}/portainer_api.sh" 2>/dev/null || true
 
 # ============================================================
 print_header "Paso 9 de 11 — Instalar Kopia Backup"
@@ -261,56 +262,12 @@ else
 fi
 
 # ============================================================
-# 7. INSTRUCCIONES DE ACCESO
-# ============================================================
-echo ""
-windows_instruction "ACCESO A KOPIA BACKUP
-
-1. Activa Tailscale VPN en Windows
-
-2. Abre tu navegador y ve a:
-   ${URL_KOPIA}
-
-3. Ingresa las credenciales:
-   Usuario: ${KOPIA_WEB_USER}
-   Contraseña: ${KOPIA_WEB_PASS}
-
-4. Desde la interfaz web puedes:
-   - Ver historial de backups
-   - Restaurar archivos específicos
-   - Configurar notificaciones
-   - Agregar repositorios remotos (S3, B2, etc.)
-
-GUARDA ESTAS CREDENCIALES:
-   Web usuario:    ${KOPIA_WEB_USER}
-   Web contraseña: ${KOPIA_WEB_PASS}
-   Cifrado:        (la contraseña que elegiste al instalar)"
-
-# ============================================================
-# RESUMEN FINAL
+# RESUMEN
 # ============================================================
 echo ""
 print_separator
 echo ""
 log_success "Kopia Backup instalado exitosamente"
 echo ""
-echo -e "  ${COLOR_BOLD_WHITE}Acceso:${COLOR_RESET}"
-echo -e "    URL:          ${COLOR_CYAN}${URL_KOPIA}${COLOR_RESET}"
-echo -e "    Usuario:      ${COLOR_CYAN}${KOPIA_WEB_USER}${COLOR_RESET}"
-echo -e "    Contraseña:   ${COLOR_CYAN}${KOPIA_WEB_PASS}${COLOR_RESET}"
-echo ""
-echo -e "  ${COLOR_BOLD_WHITE}Configuración de backups:${COLOR_RESET}"
-echo -e "    Fuente:       ${COLOR_CYAN}${APPS_DIR}${COLOR_RESET}"
-echo -e "    Destino:      ${COLOR_CYAN}${BACKUP_DIR}${COLOR_RESET}"
-echo -e "    Schedule:     ${COLOR_CYAN}Diario a las 2:00 AM${COLOR_RESET}"
-echo -e "    Retención:    ${COLOR_CYAN}7 diarios, 4 semanales, 6 mensuales${COLOR_RESET}"
-echo -e "    Cifrado:      ${COLOR_GREEN}Sí (AES-256)${COLOR_RESET}"
-echo ""
-echo ""
-log_success "¡Instalación core completa! (10/10 pasos)"
-echo ""
-log_info "Ahora puedes instalar las aplicaciones opcionales:"
-log_info "  11) N8N — Automatización de flujos de trabajo"
-log_info "  12) OpenClaw — Asistente IA personal"
-log_info "  13) File Browser — Gestor de archivos web"
+log_info "Las credenciales de acceso se mostrarán al final de la instalación."
 echo ""

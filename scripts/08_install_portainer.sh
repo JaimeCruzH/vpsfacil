@@ -283,43 +283,12 @@ portainer_save_creds "$PORTAINER_ADMIN" "$PORTAINER_ADMIN_PASS"
 log_success "Credenciales guardadas → las apps se desplegarán automáticamente en Portainer ✓"
 
 # ============================================================
-# 5. INSTRUCCIONES DE ACCESO
-# ============================================================
-echo ""
-windows_instruction "ACCESO A PORTAINER
-
-1. Asegúrate de tener Tailscale VPN activo en Windows
-
-2. Abre tu navegador y ve a:
-   ${URL_PORTAINER}
-
-3. Ingresa tus credenciales:
-   Usuario:    ${PORTAINER_ADMIN}
-   Contraseña: (la que acabas de configurar)
-
-4. En la pantalla de inicio, selecciona:
-   'Get Started' → 'local'
-
-5. Ya puedes ver y gestionar todos tus contenedores Docker.
-   Cada aplicación que instales aparecerá como un stack
-   editable en la sección 'Stacks'."
-
-# ============================================================
-# RESUMEN FINAL
+# RESUMEN
 # ============================================================
 echo ""
 print_separator
 echo ""
 log_success "Portainer instalado exitosamente"
 echo ""
-echo -e "  ${COLOR_BOLD_WHITE}Acceso:${COLOR_RESET}"
-echo -e "    URL:          ${COLOR_CYAN}${URL_PORTAINER}${COLOR_RESET}"
-echo -e "    Usuario:      ${COLOR_CYAN}${PORTAINER_ADMIN}${COLOR_RESET}"
-echo -e "    Acceso:       ${COLOR_YELLOW}Solo con Tailscale VPN activo${COLOR_RESET}"
-echo -e "    Certificado:  ${COLOR_GREEN}Let's Encrypt (renovación automática)${COLOR_RESET}"
-echo ""
-echo -e "  ${COLOR_BOLD_WHITE}Directorio:${COLOR_RESET}"
-echo -e "    ${COLOR_CYAN}${APP_DIR}${COLOR_RESET}"
-echo ""
-log_info "Próximo paso: Instalar Kopia Backup (opción 10)"
+log_info "Las credenciales de acceso se mostrarán al final de la instalación."
 echo ""
