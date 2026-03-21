@@ -703,7 +703,7 @@ ask_all_config() {
     echo -e "${COLOR_BOLD_WHITE}PREGUNTA 2b — Contraseña del usuario admin${COLOR_RESET}"
     echo ""
     log_info "Define una contraseña para el usuario '${ADMIN_USER}'."
-    log_info "Requisitos: mínimo 8 caracteres, solo letras (a-z, A-Z) y números (0-9)."
+    log_info "Requisitos: mínimo 12 caracteres, solo letras (a-z, A-Z) y números (0-9)."
     log_warning "Guarda esta contraseña en un lugar seguro."
     echo ""
 
@@ -712,8 +712,8 @@ ask_all_config() {
         ADMIN_PASS2=$(prompt_password "Confirma la contraseña")
         if [[ "$ADMIN_PASS" != "$ADMIN_PASS2" ]]; then
             log_warning "Las contraseñas no coinciden."
-        elif [[ ${#ADMIN_PASS} -lt 8 ]]; then
-            log_warning "Mínimo 8 caracteres."
+        elif [[ ${#ADMIN_PASS} -lt 12 ]]; then
+            log_warning "Mínimo 12 caracteres."
         elif [[ ! "$ADMIN_PASS" =~ ^[a-zA-Z0-9]+$ ]]; then
             log_warning "Solo se permiten letras (a-z, A-Z) y números (0-9). Sin espacios ni símbolos."
         else

@@ -41,6 +41,7 @@ source "${LIB_DIR}/colors.sh"
 source "${LIB_DIR}/config.sh"
 source "${LIB_DIR}/utils.sh"
 source_config
+source "${LIB_DIR}/portainer_api.sh" 2>/dev/null || true
 
 # ============================================================
 print_header "Paso 8 de 11 — Instalar Portainer"
@@ -48,8 +49,9 @@ print_header "Paso 8 de 11 — Instalar Portainer"
 
 check_root
 
-# URL local para llamadas API (localhost porque DNS puede no resolver localmente)
-PORTAINER_URL="https://localhost:9443"
+# PORTAINER_URL viene de portainer_api.sh (https://localhost:9443)
+# Fallback por si portainer_api.sh no se cargó
+PORTAINER_URL="${PORTAINER_URL:-https://localhost:9443}"
 
 log_info "Portainer es la interfaz web para gestionar todos los"
 log_info "contenedores Docker de tu servidor."
