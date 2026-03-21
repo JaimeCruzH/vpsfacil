@@ -234,12 +234,15 @@ readonly PORT_PORTAINER="9443"
 readonly PORT_FILEBROWSER="8080"
 readonly PORT_KOPIA="51515"
 readonly PORT_BESZEL="8090"
+readonly PORT_OPENCLAW_WS="18789"
+readonly PORT_OPENCLAW_HTTP="18790"
 
 # Imágenes Docker core
 readonly IMG_PORTAINER="portainer/portainer-ce:latest"
 readonly IMG_FILEBROWSER="filebrowser/filebrowser:latest"
 readonly IMG_KOPIA="kopia/kopia:latest"
 readonly IMG_BESZEL="henrygd/beszel:latest"
+readonly IMG_OPENCLAW_BASE="node:24-bookworm"
 
 # Timeouts (en segundos)
 readonly TIMEOUT_DOCKER_START=60
