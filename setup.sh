@@ -3,11 +3,13 @@
 # setup.sh — Script principal de VPSfacil
 # VPSfacil - Sistema Automatizado de Instalación en VPS
 #
-# ARCHIVO AUTOCONTENENIDO - incluye todas las librerías
+# ARCHIVO AUTOCONTENIDO - incluye todas las librerías
 # Descarga y ejecuta con:
 #   curl -sSL https://raw.githubusercontent.com/JaimeCruzH/vpsfacil/main/setup.sh | bash
 #   o:
 #   curl -sSL https://raw.githubusercontent.com/JaimeCruzH/vpsfacil/main/setup.sh > setup.sh && bash setup.sh
+#
+# Ejecuta los 11 pasos de instalación como root, sin interrupciones.
 #
 # Requisitos:
 #   - Debian 12 (Bookworm)
@@ -82,7 +84,7 @@ print_banner() {
     echo -e "${COLOR_BOLD_BLUE}║${COLOR_RESET}  ${COLOR_BOLD_GREEN} ╚████╔╝ ██║     ███████║██║     ██║  ██║╚██████╗██║███████╗${COLOR_RESET}           ${COLOR_BOLD_BLUE}║${COLOR_RESET}"
     echo -e "${COLOR_BOLD_BLUE}║${COLOR_RESET}  ${COLOR_BOLD_GREEN}  ╚═══╝  ╚═╝     ╚══════╝╚═╝     ╚═╝  ╚═╝╚═════╝╚═╝╚══════╝${COLOR_RESET}           ${COLOR_BOLD_BLUE}║${COLOR_RESET}"
     echo -e "${COLOR_BOLD_BLUE}║${COLOR_RESET}                                                              ${COLOR_BOLD_BLUE}║${COLOR_RESET}"
-    echo -e "${COLOR_BOLD_BLUE}║${COLOR_RESET}  ${COLOR_BOLD_CYAN}Instalación Automatizada de VPS v1.0${COLOR_RESET}                    ${COLOR_BOLD_BLUE}║${COLOR_RESET}"
+    echo -e "${COLOR_BOLD_BLUE}║${COLOR_RESET}  ${COLOR_BOLD_CYAN}Instalación Automatizada de VPS v2.0${COLOR_RESET}                    ${COLOR_BOLD_BLUE}║${COLOR_RESET}"
     echo -e "${COLOR_BOLD_BLUE}║${COLOR_RESET}  ${COLOR_WHITE}Debian 12 · Docker · Tailscale VPN${COLOR_RESET}                      ${COLOR_BOLD_BLUE}║${COLOR_RESET}"
     echo -e "${COLOR_BOLD_BLUE}║${COLOR_RESET}                                                              ${COLOR_BOLD_BLUE}║${COLOR_RESET}"
     echo -e "${COLOR_BOLD_BLUE}╚══════════════════════════════════════════════════════════════╝${COLOR_RESET}"
@@ -131,14 +133,6 @@ check_root() {
     fi
 }
 
-check_not_root() {
-    if [[ $EUID -eq 0 ]]; then
-        log_error "Este script NO debe ejecutarse como root"
-        log_info  "Usa: su - ${ADMIN_USER} y luego ejecuta el script"
-        exit 1
-    fi
-}
-
 check_internet() {
     log_process "Verificando conectividad a internet..."
     if curl -s --max-time 10 https://www.google.com > /dev/null 2>&1; then
@@ -182,12 +176,11 @@ confirm() {
     while true; do
         echo -ne "${PREFIX_PROMPT} ${prompt} ${COLOR_BOLD_WHITE}(sí/no)${COLOR_RESET}: " >&2
         read -r respuesta < /dev/tty
-        # Limpiar espacios y retornos de carro
         respuesta="$(echo "$respuesta" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
         case "${respuesta,,}" in
             si|sí|s|yes|y) return 0 ;;
             no|n)           return 1 ;;
-            "") ;; # Input vacío - mostrar advertencia
+            "") ;;
             *) log_warning "Por favor responde 'sí' o 'no'" ;;
         esac
     done
@@ -205,7 +198,6 @@ prompt_input() {
     fi
 
     read -r respuesta < /dev/tty
-    # Limpiar espacios en blanco al inicio y final
     respuesta="$(echo "$respuesta" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
 
     if [[ -z "$respuesta" && -n "$default" ]]; then
@@ -221,7 +213,6 @@ prompt_password() {
 
     echo -ne "${PREFIX_PROMPT} ${prompt}: " >&2
     read -rs pass < /dev/tty
-    # Limpiar espacios en blanco al inicio y final
     pass="$(echo "$pass" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
     echo "" >&2
     echo "$pass"
@@ -359,6 +350,25 @@ windows_instruction() {
     echo ""
 }
 
+wait_for_dpkg() {
+    local max_wait=120
+    local elapsed=0
+
+    while fuser /var/lib/dpkg/lock-frontend > /dev/null 2>&1 || \
+          fuser /var/lib/dpkg/lock > /dev/null 2>&1 || \
+          fuser /var/lib/apt/lists/lock > /dev/null 2>&1; do
+        if [[ $elapsed -eq 0 ]]; then
+            log_process "Esperando que dpkg/apt termine (otro proceso lo está usando)..."
+        fi
+        sleep 5
+        elapsed=$((elapsed + 5))
+        if [[ $elapsed -ge $max_wait ]]; then
+            log_warning "dpkg sigue bloqueado después de ${max_wait}s. Continuando de todos modos..."
+            break
+        fi
+    done
+}
+
 # ============================================================
 # LIBRERÍAS EMBEBIDAS (config.sh)
 # ============================================================
@@ -399,144 +409,6 @@ source_config() {
     exit 1
 }
 
-ask_initial_config() {
-    print_header "Configuración Inicial"
-
-    log_info "Antes de instalar necesitamos dos datos básicos:"
-    log_info "  1. Tu nombre de dominio (ej: miempresa.com)"
-    log_info "  2. El nombre del usuario administrador a crear en el servidor"
-    echo ""
-    log_info "Esta información se usará en toda la instalación."
-    echo ""
-    print_separator
-    echo ""
-
-    echo -e "${COLOR_BOLD_WHITE}PREGUNTA 1 de 3 — Dominio${COLOR_RESET}"
-    echo ""
-    log_info "Escribe el nombre de tu dominio principal."
-    log_info "Ejemplos: agentexperto.work  |  miempresa.com  |  startup.io"
-    echo ""
-    while true; do
-        DOMAIN=$(prompt_input "¿Cuál es tu dominio?" "agentexperto.work")
-        DOMAIN="${DOMAIN,,}"
-
-        if [[ "$DOMAIN" =~ ^([a-z0-9][a-z0-9-]*\.)+[a-z]{2,}$ ]]; then
-            break
-        else
-            log_warning "Formato inválido. Escribe solo el dominio, sin http ni www."
-            log_info    "Correcto:   agentexperto.work"
-            log_info    "Incorrecto: https://agentexperto.work  o  www.agentexperto.work"
-        fi
-    done
-
-    echo ""
-    print_separator
-    echo ""
-
-    echo -e "${COLOR_BOLD_WHITE}PREGUNTA 2 de 3 — Usuario administrador${COLOR_RESET}"
-    echo ""
-    log_info "Este usuario reemplazará a 'root' como administrador del servidor."
-    log_info "Con él te conectarás vía SSH después de la instalación."
-    log_info "Usa solo letras minúsculas, números y guión bajo (sin espacios)."
-    log_info "Ejemplos: jaime  |  admin  |  carlos_lopez"
-    echo ""
-    while true; do
-        ADMIN_USER=$(prompt_input "¿Qué nombre de usuario quieres crear?" "admin")
-        ADMIN_USER="${ADMIN_USER,,}"
-
-        if [[ "$ADMIN_USER" =~ ^[a-z][a-z0-9_]{1,31}$ ]]; then
-            # Validar que el usuario sea válido, luego verificar si existe
-            if getent passwd "$ADMIN_USER" > /dev/null 2>&1; then
-                # El usuario ya existe
-                echo ""
-                log_warning "El usuario '${ADMIN_USER}' ya existe en el sistema"
-                if confirm "¿Deseas eliminarlo y recrearlo desde cero?"; then
-                    echo ""
-                    log_process "Eliminando usuario existente: ${ADMIN_USER}"
-                    userdel -r "$ADMIN_USER" 2>/dev/null || true
-                    log_success "Usuario ${ADMIN_USER} eliminado ✓"
-                    echo ""
-                    break
-                else
-                    log_warning "Por favor, elige un nombre de usuario diferente"
-                    echo ""
-                    continue
-                fi
-            else
-                # El usuario no existe - OK, podemos continuar
-                break
-            fi
-        else
-            log_warning "Nombre inválido. Solo letras minúsculas, números y guión bajo."
-            log_info    "Correcto:   jaime  |  admin  |  mi_usuario"
-            log_info    "Incorrecto: Mi Usuario  |  123admin  |  admin@host"
-            echo ""
-        fi
-    done
-
-    echo ""
-    print_separator
-    echo ""
-
-    # Pedir contraseña del nuevo usuario (PARTE DE PREGUNTA 2)
-    log_step "Contraseña del usuario administrador"
-    echo ""
-    log_info "Define una contraseña para el usuario '${ADMIN_USER}'."
-    log_warning "Esta contraseña la necesitarás ocasionalmente para sudo."
-    echo ""
-
-    while true; do
-        ADMIN_PASS=$(prompt_password "Ingresa la contraseña para '${ADMIN_USER}'")
-        ADMIN_PASS2=$(prompt_password "Confirma la contraseña")
-
-        if [[ "$ADMIN_PASS" == "$ADMIN_PASS2" ]]; then
-            if [[ ${#ADMIN_PASS} -lt 8 ]]; then
-                log_warning "La contraseña debe tener al menos 8 caracteres. Intenta de nuevo."
-            else
-                break
-            fi
-        else
-            log_warning "Las contraseñas no coinciden. Intenta de nuevo."
-        fi
-    done
-
-    echo ""
-    print_separator
-    echo ""
-
-    echo -e "${COLOR_BOLD_WHITE}PREGUNTA 3 de 3 — Zona horaria${COLOR_RESET}"
-    echo ""
-    log_info "Define la zona horaria del servidor (afecta logs y backups)."
-    log_info "Ejemplos:"
-    log_info "  América: America/Santiago  |  America/Bogota  |  America/Mexico_City"
-    log_info "  Europa:  Europe/Madrid     |  Europe/London"
-    log_info "  Si no estás seguro, usa: UTC"
-    echo ""
-    TIMEZONE=$(prompt_input "¿Cuál es tu zona horaria?" "America/Santiago")
-
-    echo ""
-    print_separator
-    log_info "Resumen de configuración:"
-    echo ""
-    echo -e "   ${COLOR_BOLD_WHITE}Dominio:${COLOR_RESET}       ${COLOR_CYAN}${DOMAIN}${COLOR_RESET}"
-    echo -e "   ${COLOR_BOLD_WHITE}Usuario admin:${COLOR_RESET} ${COLOR_CYAN}${ADMIN_USER}${COLOR_RESET}"
-    echo -e "   ${COLOR_BOLD_WHITE}Zona horaria:${COLOR_RESET}  ${COLOR_CYAN}${TIMEZONE}${COLOR_RESET}"
-    echo -e "   ${COLOR_BOLD_WHITE}Home del usuario:${COLOR_RESET} ${COLOR_CYAN}/home/${ADMIN_USER}${COLOR_RESET}"
-    echo -e "   ${COLOR_BOLD_WHITE}Apps en:${COLOR_RESET}       ${COLOR_CYAN}/home/${ADMIN_USER}/apps${COLOR_RESET}"
-    echo -e "   ${COLOR_BOLD_WHITE}URL VPN base:${COLOR_RESET}  ${COLOR_CYAN}*.vpn.${DOMAIN}${COLOR_RESET}"
-    echo ""
-    print_separator
-
-    if ! confirm "¿Es correcta esta configuración?"; then
-        log_info "Volvamos a intentarlo..."
-        ask_initial_config
-        return
-    fi
-
-    _derive_config_vars
-    save_config
-}
-
 _derive_config_vars() {
     export ADMIN_HOME="/home/${ADMIN_USER}"
     export APPS_DIR="${ADMIN_HOME}/apps"
@@ -547,27 +419,18 @@ _derive_config_vars() {
     export CF_WILDCARD="*.vpn.${DOMAIN}"
 
     export URL_PORTAINER="https://portainer.vpn.${DOMAIN}:9443"
-    export URL_N8N="https://n8n.vpn.${DOMAIN}:5678"
     export URL_FILEBROWSER="http://files.vpn.${DOMAIN}:8080"
-    export URL_OPENCLAW="https://openclaw.vpn.${DOMAIN}:18789"
     export URL_KOPIA="https://kopia.vpn.${DOMAIN}:51515"
 
     export CERT_FILE="${CERTS_DIR}/origin-cert.pem"
     export CERT_KEY="${CERTS_DIR}/origin-cert-key.pem"
     export CERT_CA="${CERTS_DIR}/cloudflare-ca.crt"
 
-    # Exportar contraseña del usuario admin para scripts child
     export ADMIN_PASS="${ADMIN_PASS:-}"
 }
 
 save_config() {
-    local config_file
-
-    if [[ -d "/home/${ADMIN_USER}" ]]; then
-        config_file="/home/${ADMIN_USER}/setup.conf"
-    else
-        config_file="/tmp/vpsfacil_setup.conf"
-    fi
+    local config_file="/tmp/vpsfacil_setup.conf"
 
     cat > "$config_file" << EOF
 # ============================================================
@@ -580,12 +443,373 @@ DOMAIN="${DOMAIN}"
 ADMIN_USER="${ADMIN_USER}"
 TIMEZONE="${TIMEZONE:-America/Santiago}"
 INSTALLATION_DATE="$(date '+%Y-%m-%d')"
+PORTAINER_ADMIN="${PORTAINER_ADMIN:-}"
+PORTAINER_PASS="${PORTAINER_PASS:-}"
+KOPIA_PASS="${KOPIA_PASS:-}"
 EOF
 
-    chmod 644 "$config_file"
+    chmod 600 "$config_file"
     log_success "Configuración guardada en: ${config_file}"
 }
 
+# ============================================================
+# LIBRERÍAS EMBEBIDAS (progress.sh)
+# ============================================================
+
+PROGRESS_LOG="/tmp/vpsfacil_progress.log"
+
+declare -gA CORE_STEPS=(
+    [1]="Pre-verificaciones del Sistema"
+    [2]="Crear Usuario Administrador"
+    [3]="Firewall UFW"
+    [4]="Docker & Docker Compose"
+    [5]="Tailscale VPN"
+    [6]="Certificados SSL"
+    [7]="DNS Cloudflare"
+    [8]="Portainer"
+    [9]="Kopia Backup"
+    [10]="File Browser"
+    [11]="Finalizar: Permisos y SSH"
+)
+
+progress_init() {
+    if [[ -f "$PROGRESS_LOG" ]]; then
+        log_info "Detectada instalación previa. Continuando desde donde se quedó..."
+    else
+        > "$PROGRESS_LOG"
+        log_info "Iniciando nuevo registro de progreso"
+    fi
+}
+
+progress_is_completed() {
+    local step_num="$1"
+    if [[ -f "$PROGRESS_LOG" ]]; then
+        grep -q "^PASO=${step_num}|.*STATUS=completado" "$PROGRESS_LOG" 2>/dev/null
+        return $?
+    fi
+    return 1
+}
+
+progress_start_step() {
+    local step_num="$1"
+    local start_epoch=$(date +%s)
+    export "STEP_${step_num}_START=$start_epoch"
+}
+
+progress_complete_step() {
+    local step_num="$1"
+    local step_name="${CORE_STEPS[$step_num]}"
+
+    local end_time=$(date '+%Y-%m-%d %H:%M:%S')
+    local end_epoch=$(date +%s)
+    local start_var="STEP_${step_num}_START"
+    local start_epoch="${!start_var:-0}"
+
+    local duration=0
+    if [[ $start_epoch -gt 0 ]]; then
+        duration=$((end_epoch - start_epoch))
+    fi
+
+    local duration_str=$(printf "%dm%02ds" $((duration / 60)) $((duration % 60)))
+
+    echo "PASO=$step_num|NOMBRE=$step_name|STATUS=completado|FIN=$end_time|DURACION=$duration_str" >> "$PROGRESS_LOG"
+
+    unset "STEP_${step_num}_START"
+}
+
+progress_fail_step() {
+    local step_num="$1"
+    local step_name="${CORE_STEPS[$step_num]}"
+    local error_msg="${2:-Unknown error}"
+
+    local fail_time=$(date '+%Y-%m-%d %H:%M:%S')
+
+    echo "PASO=$step_num|NOMBRE=$step_name|STATUS=fallido|FALLO=$fail_time|ERROR=$error_msg" >> "$PROGRESS_LOG"
+
+    unset "STEP_${step_num}_START"
+}
+
+progress_get_total_duration() {
+    if [[ ! -f "$PROGRESS_LOG" ]]; then
+        echo "0"
+        return
+    fi
+
+    local total_seconds=0
+    while IFS='|' read -r step name status rest; do
+        if [[ "$status" == "STATUS=completado" ]]; then
+            local dur_field=""
+            dur_field=$(echo "$rest" | grep -o "DURACION=[^|]*" || echo "")
+            if [[ "$dur_field" =~ DURACION=([0-9]+)m([0-9]+)s ]]; then
+                local mins="${BASH_REMATCH[1]}"
+                local secs="${BASH_REMATCH[2]}"
+                total_seconds=$((total_seconds + mins * 60 + secs))
+            fi
+        fi
+    done < "$PROGRESS_LOG"
+
+    echo "$total_seconds"
+}
+
+progress_show() {
+    local completed_count=0
+    local total_count=11
+
+    local completed_steps=""
+    if [[ -f "$PROGRESS_LOG" ]]; then
+        if grep -q "STATUS=completado" "$PROGRESS_LOG" 2>/dev/null; then
+            completed_count=$(grep "STATUS=completado" "$PROGRESS_LOG" 2>/dev/null | wc -l | tr -d ' ')
+        fi
+        completed_steps=$(grep "STATUS=completado" "$PROGRESS_LOG" 2>/dev/null | cut -d'|' -f1 | sed 's/PASO=//' | tr '\n' ' ' 2>/dev/null || echo "")
+    fi
+
+    local percentage=$((completed_count * 100 / total_count))
+
+    local bar_length=30
+    local filled=$((percentage * bar_length / 100))
+    local empty=$((bar_length - filled))
+
+    local progress_bar=""
+    for ((i = 0; i < filled; i++)); do
+        progress_bar+="█"
+    done
+    for ((i = 0; i < empty; i++)); do
+        progress_bar+="░"
+    done
+
+    echo ""
+    echo "╔═══════════════════════════════════════════════════════════════╗"
+    printf "║  Instalación VPSfacil: Progreso %d/%d (%d%%)                  ║\n" "$completed_count" "$total_count" "$percentage"
+    echo "╠═══════════════════════════════════════════════════════════════╣"
+    echo "║                                                               ║"
+    printf "║  [%s] %d%%                                ║\n" "$progress_bar" "$percentage"
+    echo "║                                                               ║"
+    echo "╠═══════════════════════════════════════════════════════════════╣"
+
+    for step_num in 1 2 3 4 5 6 7 8 9 10 11; do
+        local step_name="${CORE_STEPS[$step_num]}"
+        local status_icon="⏸"
+        local info="[en espera]"
+
+        if [[ " $completed_steps " =~ " $step_num " ]]; then
+            status_icon="✓"
+            local duration=$(grep "^PASO=$step_num|" "$PROGRESS_LOG" 2>/dev/null | grep "STATUS=completado" 2>/dev/null | tail -1 | grep -o "DURACION=[^|]*" 2>/dev/null | cut -d'=' -f2 || echo "")
+            if [[ -n "$duration" ]]; then
+                info="[completado $duration]"
+            else
+                info="[completado]"
+            fi
+        fi
+
+        printf "║  %-1s Paso %-2d: %-35s %s  ║\n" "$status_icon" "$step_num" "$step_name" "$info"
+    done
+
+    echo "║                                                               ║"
+    echo "╚═══════════════════════════════════════════════════════════════╝"
+    echo ""
+}
+
+# ============================================================
+# CONFIGURACIÓN FIJA (puertos y versiones)
+# ============================================================
+
+readonly PORT_SSH="22"
+readonly PORT_TAILSCALE="41641"
+readonly PORT_PORTAINER="9443"
+readonly PORT_FILEBROWSER="8080"
+readonly PORT_KOPIA="51515"
+
+readonly IMG_PORTAINER="portainer/portainer-ce:latest"
+readonly IMG_FILEBROWSER="filebrowser/filebrowser:latest"
+readonly IMG_KOPIA="kopia/kopia:latest"
+
+readonly TIMEOUT_DOCKER_START=60
+readonly TIMEOUT_APP_START=120
+readonly TIMEOUT_USER_INPUT=300
+
+readonly DOCKER_NETWORK="vpsfacil-net"
+readonly DOCKER_MIN_VERSION="24"
+
+# ============================================================
+# FUNCIÓN: Recopilar TODA la configuración al inicio
+# ============================================================
+ask_all_config() {
+    print_header "Configuración Inicial"
+
+    log_info "Antes de instalar, necesitamos algunos datos."
+    log_info "Todas las preguntas se hacen ahora — después, la instalación"
+    log_info "corre sin interrupciones (excepto Cloudflare y Tailscale)."
+    echo ""
+    print_separator
+    echo ""
+
+    # --- Pregunta 1: Dominio ---
+    echo -e "${COLOR_BOLD_WHITE}PREGUNTA 1 de 6 — Dominio${COLOR_RESET}"
+    echo ""
+    log_info "Escribe el nombre de tu dominio principal."
+    log_info "Ejemplos: agentexperto.work  |  miempresa.com  |  startup.io"
+    echo ""
+    while true; do
+        DOMAIN=$(prompt_input "¿Cuál es tu dominio?" "agentexperto.work")
+        DOMAIN="${DOMAIN,,}"
+
+        if [[ "$DOMAIN" =~ ^([a-z0-9][a-z0-9-]*\.)+[a-z]{2,}$ ]]; then
+            break
+        else
+            log_warning "Formato inválido. Escribe solo el dominio, sin http ni www."
+        fi
+    done
+
+    echo ""
+    print_separator
+    echo ""
+
+    # --- Pregunta 2: Usuario admin ---
+    echo -e "${COLOR_BOLD_WHITE}PREGUNTA 2 de 6 — Usuario administrador${COLOR_RESET}"
+    echo ""
+    log_info "Este usuario reemplazará a 'root' como administrador del servidor."
+    log_info "Usa solo letras minúsculas, números y guión bajo (sin espacios)."
+    echo ""
+    while true; do
+        ADMIN_USER=$(prompt_input "¿Qué nombre de usuario quieres crear?" "admin")
+        ADMIN_USER="${ADMIN_USER,,}"
+
+        if [[ "$ADMIN_USER" =~ ^[a-z][a-z0-9_]{1,31}$ ]]; then
+            if getent passwd "$ADMIN_USER" > /dev/null 2>&1; then
+                echo ""
+                log_warning "El usuario '${ADMIN_USER}' ya existe en el sistema"
+                if confirm "¿Deseas eliminarlo y recrearlo desde cero?"; then
+                    log_process "Eliminando usuario existente: ${ADMIN_USER}"
+                    userdel -r "$ADMIN_USER" 2>/dev/null || true
+                    log_success "Usuario ${ADMIN_USER} eliminado ✓"
+                    break
+                else
+                    log_warning "Por favor, elige un nombre de usuario diferente"
+                    echo ""
+                    continue
+                fi
+            else
+                break
+            fi
+        else
+            log_warning "Nombre inválido. Solo letras minúsculas, números y guión bajo."
+        fi
+    done
+
+    echo ""
+    print_separator
+    echo ""
+
+    # --- Pregunta 3: Contraseña admin ---
+    echo -e "${COLOR_BOLD_WHITE}PREGUNTA 3 de 6 — Contraseña del usuario admin${COLOR_RESET}"
+    echo ""
+    log_info "Define una contraseña para el usuario '${ADMIN_USER}'."
+    log_warning "Guarda esta contraseña en un lugar seguro."
+    echo ""
+
+    while true; do
+        ADMIN_PASS=$(prompt_password "Contraseña para '${ADMIN_USER}'")
+        ADMIN_PASS2=$(prompt_password "Confirma la contraseña")
+        if [[ "$ADMIN_PASS" == "$ADMIN_PASS2" && ${#ADMIN_PASS} -ge 8 ]]; then
+            break
+        elif [[ "$ADMIN_PASS" != "$ADMIN_PASS2" ]]; then
+            log_warning "Las contraseñas no coinciden."
+        else
+            log_warning "Mínimo 8 caracteres."
+        fi
+    done
+
+    echo ""
+    print_separator
+    echo ""
+
+    # --- Pregunta 4: Zona horaria ---
+    echo -e "${COLOR_BOLD_WHITE}PREGUNTA 4 de 6 — Zona horaria${COLOR_RESET}"
+    echo ""
+    log_info "Define la zona horaria del servidor (afecta logs y backups)."
+    log_info "Ejemplos: America/Santiago  |  America/Bogota  |  America/Mexico_City"
+    echo ""
+    TIMEZONE=$(prompt_input "¿Cuál es tu zona horaria?" "America/Santiago")
+
+    echo ""
+    print_separator
+    echo ""
+
+    # --- Pregunta 5: Portainer ---
+    echo -e "${COLOR_BOLD_WHITE}PREGUNTA 5 de 6 — Credenciales de Portainer${COLOR_RESET}"
+    echo ""
+    log_info "Portainer es el panel web para gestionar contenedores Docker."
+    echo ""
+    PORTAINER_ADMIN=$(prompt_input "Usuario Portainer" "admin")
+    echo ""
+
+    while true; do
+        PORTAINER_PASS=$(prompt_password "Contraseña para ${PORTAINER_ADMIN} en Portainer")
+        PORTAINER_PASS2=$(prompt_password "Confirma la contraseña")
+        if [[ "$PORTAINER_PASS" == "$PORTAINER_PASS2" && ${#PORTAINER_PASS} -ge 8 ]]; then
+            break
+        elif [[ "$PORTAINER_PASS" != "$PORTAINER_PASS2" ]]; then
+            log_warning "Las contraseñas no coinciden."
+        else
+            log_warning "Mínimo 8 caracteres."
+        fi
+    done
+
+    echo ""
+    print_separator
+    echo ""
+
+    # --- Pregunta 6: Kopia ---
+    echo -e "${COLOR_BOLD_WHITE}PREGUNTA 6 de 6 — Contraseña de cifrado Kopia${COLOR_RESET}"
+    echo ""
+    log_warning "Esta contraseña cifra tus backups. Guárdala en un lugar seguro."
+    log_info "SIN ella, no podrás restaurar tus backups."
+    echo ""
+
+    while true; do
+        KOPIA_PASS=$(prompt_password "Contraseña para cifrar backups de Kopia")
+        KOPIA_PASS2=$(prompt_password "Confirma la contraseña")
+        if [[ "$KOPIA_PASS" == "$KOPIA_PASS2" && ${#KOPIA_PASS} -ge 8 ]]; then
+            break
+        elif [[ "$KOPIA_PASS" != "$KOPIA_PASS2" ]]; then
+            log_warning "Las contraseñas no coinciden."
+        else
+            log_warning "Mínimo 8 caracteres."
+        fi
+    done
+
+    echo ""
+    print_separator
+    echo ""
+
+    # --- Resumen y confirmación ---
+    log_info "Resumen de configuración:"
+    echo ""
+    echo -e "   ${COLOR_BOLD_WHITE}Dominio:${COLOR_RESET}          ${COLOR_CYAN}${DOMAIN}${COLOR_RESET}"
+    echo -e "   ${COLOR_BOLD_WHITE}Usuario admin:${COLOR_RESET}    ${COLOR_CYAN}${ADMIN_USER}${COLOR_RESET}"
+    echo -e "   ${COLOR_BOLD_WHITE}Zona horaria:${COLOR_RESET}     ${COLOR_CYAN}${TIMEZONE}${COLOR_RESET}"
+    echo -e "   ${COLOR_BOLD_WHITE}Home:${COLOR_RESET}             ${COLOR_CYAN}/home/${ADMIN_USER}${COLOR_RESET}"
+    echo -e "   ${COLOR_BOLD_WHITE}Apps en:${COLOR_RESET}          ${COLOR_CYAN}/home/${ADMIN_USER}/apps${COLOR_RESET}"
+    echo -e "   ${COLOR_BOLD_WHITE}URL VPN base:${COLOR_RESET}     ${COLOR_CYAN}*.vpn.${DOMAIN}${COLOR_RESET}"
+    echo -e "   ${COLOR_BOLD_WHITE}Portainer user:${COLOR_RESET}   ${COLOR_CYAN}${PORTAINER_ADMIN}${COLOR_RESET}"
+    echo -e "   ${COLOR_BOLD_WHITE}Portainer pass:${COLOR_RESET}   ●●●●●●●●"
+    echo -e "   ${COLOR_BOLD_WHITE}Kopia cifrado:${COLOR_RESET}    ●●●●●●●●"
+    echo ""
+    print_separator
+
+    if ! confirm "¿Es correcta esta configuración?"; then
+        log_info "Volvamos a intentarlo..."
+        ask_all_config
+        return
+    fi
+
+    # Exportar todo
+    export DOMAIN ADMIN_USER ADMIN_PASS TIMEZONE
+    export PORTAINER_ADMIN PORTAINER_PASS KOPIA_PASS
+
+    _derive_config_vars
+    save_config
+}
 
 # ============================================================
 # FUNCIÓN: Ejecutar un script de instalación (local o remoto)
@@ -595,7 +819,6 @@ run_phase_script() {
     local script_path
 
     if [[ -n "${SCRIPT_DIR}" && "${SCRIPT_DIR}" != "" ]]; then
-        # Ejecución local — usar script del repo
         script_path="${SCRIPT_DIR}/scripts/${script_name}"
         if [[ ! -f "$script_path" ]]; then
             log_error "Script no encontrado: $script_path"
@@ -603,7 +826,6 @@ run_phase_script() {
         fi
         bash "$script_path"
     else
-        # Ejecución remota — descargar a archivo temporal y ejecutar
         local tmp_script
         tmp_script=$(mktemp)
         curl -sSL "${REPO_RAW}/scripts/${script_name}?v=$(date +%s)" > "$tmp_script"
@@ -615,12 +837,54 @@ run_phase_script() {
 }
 
 # ============================================================
-# HABILITAR STRICT MODE AHORA QUE LAS LIBRERÍAS ESTÁN CARGADAS
+# FUNCIÓN: Ejecutar un paso con tracking de progreso
+# ============================================================
+run_step() {
+    local step_num="$1"
+    local script_name="$2"
+    local description="$3"
+
+    # Saltar si ya completado (para resume)
+    if progress_is_completed "$step_num"; then
+        log_info "Paso $step_num ya completado, saltando..."
+        return 0
+    fi
+
+    echo ""
+    log_step "Paso $step_num de 11: $description"
+    echo ""
+
+    progress_start_step "$step_num"
+
+    # Ejecutar el script
+    set +e
+    run_phase_script "$script_name"
+    local exit_code=$?
+    set -e
+
+    if [[ $exit_code -eq 0 ]]; then
+        progress_complete_step "$step_num"
+        echo ""
+        progress_show
+    else
+        progress_fail_step "$step_num" "Exit code $exit_code"
+        echo ""
+        progress_show
+        echo ""
+        log_error "INSTALACIÓN DETENIDA en Paso $step_num: $description"
+        log_info "El progreso ha sido guardado. Cuando resuelvas el error,"
+        log_info "reconéctate como root y ejecuta nuevamente: bash setup.sh"
+        exit 1
+    fi
+}
+
+# ============================================================
+# HABILITAR STRICT MODE
 # ============================================================
 set -euo pipefail
 
 # ============================================================
-# SCRIPT PRINCIPAL - setup.sh
+# SCRIPT PRINCIPAL
 # ============================================================
 
 REPO_RAW="https://raw.githubusercontent.com/JaimeCruzH/vpsfacil/main"
@@ -634,11 +898,10 @@ fi
 clear
 print_banner
 echo ""
-print_header "FASE A - Preparación (setup.sh)"
+print_header "Instalación VPSfacil"
 echo ""
 
-log_success "Sistema de instalación VPSfacil"
-log_success "Ejecución: FASE A (como root)"
+log_success "Sistema de instalación VPSfacil v2.0"
 echo ""
 
 # Verificación inicial
@@ -647,72 +910,117 @@ check_debian12
 check_internet
 
 echo ""
-log_success "Procediendo con FASE A..."
-echo ""
-
-# Pedir configuración inicial
-ask_initial_config
-
-
-# Ejecutar PASO 1: precheck
-log_step "Paso 1 - Verificaciones previas"
-run_phase_script "00_precheck.sh" || { log_error "Paso 1 falló"; exit 1; }
-
-# Ejecutar PASO 2: crear usuario
-echo ""
-log_step "Paso 2 - Crear usuario administrador"
-run_phase_script "01_create_user.sh" || { log_error "Paso 2 falló"; exit 1; }
-
-# Ejecutar PASO 3: secure SSH
-echo ""
-log_step "Paso 3 - Hardening SSH"
-run_phase_script "02_secure_ssh.sh" || { log_error "Paso 3 falló"; exit 1; }
-
-# Ejecutar PASO 5: Tailscale
-echo ""
-log_step "Paso 5 - Instalar Tailscale VPN"
-run_phase_script "05_install_tailscale.sh" || { log_error "Paso 5 falló"; exit 1; }
 
 # ============================================================
-# FASE A COMPLETADA - PARAR AQUÍ
+# DETECTAR INSTALACIÓN PREVIA (RESUME)
 # ============================================================
-echo ""
+RESUME_MODE=false
+
+if [[ -f "/tmp/vpsfacil_setup.conf" && -f "$PROGRESS_LOG" ]]; then
+    echo ""
+    log_warning "Se detectó una instalación previa en progreso."
+    echo ""
+
+    # Cargar configuración previa
+    source "/tmp/vpsfacil_setup.conf"
+    _derive_config_vars
+
+    # Mostrar progreso actual
+    set +e
+    progress_show
+    set -e
+
+    if confirm "¿Deseas continuar desde donde se quedó?"; then
+        RESUME_MODE=true
+        log_success "Continuando instalación previa..."
+        # Exportar variables
+        export DOMAIN ADMIN_USER ADMIN_PASS TIMEZONE
+        export PORTAINER_ADMIN PORTAINER_PASS KOPIA_PASS
+    else
+        if confirm "¿Deseas empezar de CERO (se borrará el progreso anterior)?"; then
+            rm -f "$PROGRESS_LOG"
+            rm -f "/tmp/vpsfacil_setup.conf"
+            log_info "Progreso anterior eliminado."
+        else
+            log_info "Cancelado."
+            exit 0
+        fi
+    fi
+fi
+
+# Si no es resume, pedir toda la configuración
+if [[ "$RESUME_MODE" == "false" ]]; then
+    ask_all_config
+fi
+
+# Inicializar progreso
+progress_init
+
 echo ""
 print_separator
 echo ""
-log_success "✓ FASE A completada exitosamente"
+log_info "Configuración:"
+echo -e "    Dominio:  ${COLOR_CYAN}${DOMAIN}${COLOR_RESET}"
+echo -e "    Usuario:  ${COLOR_CYAN}${ADMIN_USER}${COLOR_RESET}"
 echo ""
-echo -e "${COLOR_BOLD_WHITE}Hasta aquí llegamos con la ventana del usuario ROOT${COLOR_RESET}"
-echo -e "${COLOR_BOLD_WHITE}═══════════════════════════════════════════════════════${COLOR_RESET}"
+log_info "Iniciando instalación de 11 pasos..."
 echo ""
-log_warning "IMPORTANTE: No continúes en esta ventana"
-log_warning "IMPORTANTE: Cierra esta ventana de root DESPUÉS del siguiente paso"
+print_separator
+
+# ============================================================
+# EJECUTAR LOS 11 PASOS
+# ============================================================
+
+run_step 1  "00_precheck.sh"           "Pre-verificaciones del Sistema"
+run_step 2  "01_create_user.sh"        "Crear Usuario Administrador"
+run_step 3  "03_install_firewall.sh"   "Instalar Firewall UFW"
+run_step 4  "04_install_docker.sh"     "Instalar Docker & Docker Compose"
+run_step 5  "05_install_tailscale.sh"  "Instalar Tailscale VPN"
+run_step 6  "06_setup_certificates.sh" "Configurar Certificados SSL"
+run_step 7  "07_setup_dns.sh"          "Configurar DNS en Cloudflare"
+run_step 8  "08_install_portainer.sh"  "Instalar Portainer"
+run_step 9  "09_install_kopia.sh"      "Instalar Kopia Backup"
+run_step 10 "10_install_filebrowser.sh" "Instalar File Browser"
+run_step 11 "11_finalize.sh"           "Finalizar: Permisos y Seguridad SSH"
+
+# ============================================================
+# RESUMEN FINAL
+# ============================================================
 echo ""
-echo -e "${COLOR_BOLD_WHITE}PRÓXIMO PASO:${COLOR_RESET}"
 echo ""
-log_info "1. Abre una NUEVA ventana de Bitvise SSH con:"
+
+# Calcular duración total
+total_seconds=$(progress_get_total_duration)
+total_mins=$((total_seconds / 60))
+total_secs=$((total_seconds % 60))
+
 echo ""
-echo -e "   ${COLOR_BOLD_CYAN}Host:${COLOR_RESET}     Tu IP de VPS"
-echo -e "   ${COLOR_BOLD_CYAN}Usuario:${COLOR_RESET}  ${ADMIN_USER}"
-echo -e "   ${COLOR_BOLD_CYAN}Auth:${COLOR_RESET}     publickey → ${ADMIN_USER}_key.pem"
+print_separator
 echo ""
-log_info "2. En esa nueva ventana (conectado como ${ADMIN_USER}), ejecuta:"
+log_success "¡Instalación VPSfacil Completada!"
 echo ""
-echo -e "   ${COLOR_BOLD_GREEN}curl -sSL \"${REPO_RAW}/scripts/install_core.sh?v=\$(date +%s)\" > ~/install_core.sh && bash ~/install_core.sh${COLOR_RESET}"
+echo -e "  ${COLOR_BOLD_WHITE}Tiempo total:${COLOR_RESET}      ${COLOR_CYAN}${total_mins}m ${total_secs}s${COLOR_RESET}"
 echo ""
-log_info "   O si descargaste el archivo localmente:"
+echo -e "  ${COLOR_BOLD_WHITE}Acceso a las aplicaciones (vía Tailscale VPN):${COLOR_RESET}"
+echo -e "    Portainer:    ${COLOR_CYAN}${URL_PORTAINER}${COLOR_RESET}"
+echo -e "    File Browser: ${COLOR_CYAN}${URL_FILEBROWSER}${COLOR_RESET}"
+echo -e "    Kopia Backup: ${COLOR_CYAN}${URL_KOPIA}${COLOR_RESET}"
 echo ""
-echo -e "   ${COLOR_BOLD_GREEN}bash ~/install_core.sh${COLOR_RESET}"
+echo -e "  ${COLOR_BOLD_WHITE}Credenciales:${COLOR_RESET}"
+echo -e "    Portainer:    ${COLOR_CYAN}${PORTAINER_ADMIN}${COLOR_RESET} / ●●●●●●●●"
+echo -e "    File Browser: ${COLOR_CYAN}admin / admin${COLOR_RESET}"
 echo ""
-log_info "3. Una vez completada la instalación en la nueva ventana,"
-log_info "   puedes cerrar ESTA ventana del usuario root."
+echo -e "  ${COLOR_BOLD_WHITE}Conexión SSH:${COLOR_RESET}"
+echo -e "    Usuario:      ${COLOR_CYAN}${ADMIN_USER}${COLOR_RESET}"
+echo -e "    Auth:         ${COLOR_CYAN}Llave SSH (root deshabilitado)${COLOR_RESET}"
 echo ""
 print_separator
 echo ""
 
-# ============================================================
-# DETENER AQUÍ - FASE A COMPLETADA
-# ============================================================
-log_success "FASE A finalizada. Esperando tu próxima conexión como ${ADMIN_USER}..."
+# Limpiar archivos temporales
+rm -f "/tmp/vpsfacil_setup.conf"
+rm -f "$PROGRESS_LOG"
+log_success "Archivos temporales limpiados."
 echo ""
-exit 0
+log_success "VPSfacil finalizado. ¡Tu VPS está listo!"
+echo ""

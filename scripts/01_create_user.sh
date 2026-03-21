@@ -5,16 +5,15 @@
 #
 # Qué hace este script:
 #   1. Crea el usuario admin con home directory
-#   2. Agrega al grupo sudo
-#   3. Configura sudo sin password (para automatización)
-#   4. Genera par de llaves SSH (pública/privada)
-#   5. Configura authorized_keys para acceso por llave
-#   6. Crea estructura de directorios /apps/
-#   7. Guía al usuario para importar la llave privada en Bitvise
-#   8. Espera confirmación de que la conexión SSH funciona
+#   2. Agrega al grupo sudo con NOPASSWD
+#   3. Genera par de llaves SSH (pública/privada)
+#   4. Configura authorized_keys para acceso por llave
+#   5. Crea estructura de directorios /apps/
+#   6. Guarda configuración en setup.conf
 #
-# IMPORTANTE: Este script crea el usuario que reemplazará a root.
-# Después de este paso, NO uses root para conectarte al VPS.
+# NOTA: La verificación de conexión SSH y el hardening SSH
+# se realizan en el paso 11 (11_finalize.sh), al final de
+# toda la instalación.
 #
 # Requisitos: ejecutar como root
 # ============================================================
@@ -25,12 +24,10 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)" || SCRIPT_DIR=""
 LIB_DIR="${SCRIPT_DIR}/../lib"
 
-# Si las librerías no existen donde se esperan, asumir ejecución remota y limpiar SCRIPT_DIR
 if [[ ! -f "${LIB_DIR}/colors.sh" ]] 2>/dev/null; then
     SCRIPT_DIR=""
 fi
 
-# Si se ejecuta remotamente (vía curl | bash), descargar librerías desde GitHub
 if [[ -z "$SCRIPT_DIR" ]] || [[ ! -f "${LIB_DIR}/colors.sh" ]]; then
     REPO_RAW="https://raw.githubusercontent.com/JaimeCruzH/vpsfacil/main"
     LIB_DIR="/tmp/vpsfacil_lib_$$"
@@ -46,14 +43,11 @@ source "${LIB_DIR}/utils.sh"
 source_config
 
 # ============================================================
-print_header "Paso 2 de 10 — Crear Usuario Administrador"
+print_header "Paso 2 de 11 — Crear Usuario Administrador"
 # ============================================================
 
 log_info "Este paso creará el usuario '${ADMIN_USER}' que será"
 log_info "el administrador principal del servidor."
-log_info ""
-log_info "Después de este paso, te conectarás siempre con"
-log_info "'${ADMIN_USER}' en lugar de 'root'."
 echo ""
 
 check_root
@@ -79,7 +73,6 @@ if [[ "$USUARIO_NUEVO" == "true" ]]; then
 
     # Obtener contraseña desde setup.sh (vía ADMIN_PASS) o pedir si no existe
     if [[ -z "${ADMIN_PASS:-}" ]]; then
-        # Modo retrocompatible: pedir contraseña si no viene de setup.sh
         echo ""
         log_info "Define una contraseña para el usuario '${ADMIN_USER}'."
         log_info "Esta contraseña la necesitarás ocasionalmente para sudo."
@@ -103,18 +96,16 @@ if [[ "$USUARIO_NUEVO" == "true" ]]; then
         ADMIN_PASS="$PASS1"
         unset PASS1 PASS2
     else
-        # Contraseña viene de setup.sh
         log_info "Usando contraseña configurada en el paso anterior"
     fi
 
-    # Crear usuario con home directory y shell bash
+    # Crear usuario
     useradd \
         --create-home \
         --shell /bin/bash \
         --comment "VPSfacil Admin User" \
         "$ADMIN_USER"
 
-    # Asignar contraseña
     echo "${ADMIN_USER}:${ADMIN_PASS}" | chpasswd
 
     log_success "Usuario '${ADMIN_USER}' creado con home en /home/${ADMIN_USER} ✓"
@@ -132,14 +123,11 @@ else
     log_success "Usuario agregado al grupo sudo ✓"
 fi
 
-# Configurar sudo sin password (necesario para automatización de scripts)
 SUDOERS_FILE="/etc/sudoers.d/${ADMIN_USER}"
 if [[ ! -f "$SUDOERS_FILE" ]]; then
     echo "${ADMIN_USER} ALL=(ALL) NOPASSWD:ALL" > "$SUDOERS_FILE"
     chmod 440 "$SUDOERS_FILE"
-    log_success "Sudo sin password configurado para scripts automáticos ✓"
-    log_info    "Nota: Esto es necesario para que los scripts de instalación"
-    log_info    "funcionen sin interrupciones. Puede ser removido después."
+    log_success "Sudo sin password configurado ✓"
 else
     log_info "Configuración de sudo ya existe"
 fi
@@ -164,7 +152,6 @@ for dir in "${DIRS[@]}"; do
     fi
 done
 
-# Asignar propiedad al usuario admin
 chown -R "${ADMIN_USER}:${ADMIN_USER}" "${ADMIN_HOME}"
 chmod 750 "${ADMIN_HOME}"
 chmod 755 "${APPS_DIR}"
@@ -181,18 +168,16 @@ PRIVATE_KEY="${SSH_DIR}/id_rsa_${ADMIN_USER}"
 PUBLIC_KEY="${PRIVATE_KEY}.pub"
 AUTH_KEYS="${SSH_DIR}/authorized_keys"
 
-# Crear directorio .ssh si no existe
 if [[ ! -d "$SSH_DIR" ]]; then
     mkdir -p "$SSH_DIR"
     chmod 700 "$SSH_DIR"
     chown "${ADMIN_USER}:${ADMIN_USER}" "$SSH_DIR"
 fi
 
-# Generar llaves si no existen
 if [[ -f "$PRIVATE_KEY" ]]; then
     log_info "Las llaves SSH ya existen. No se generarán nuevas."
 else
-    log_process "Generando llaves RSA de 4096 bits (esto es seguro y puede tardar unos segundos)..."
+    log_process "Generando llaves RSA de 4096 bits..."
     sudo -u "$ADMIN_USER" ssh-keygen \
         -t rsa \
         -b 4096 \
@@ -204,7 +189,6 @@ else
     log_success "Par de llaves SSH generado ✓"
 fi
 
-# Agregar clave pública a authorized_keys
 if ! grep -qF "$(cat "$PUBLIC_KEY")" "$AUTH_KEYS" 2>/dev/null; then
     cat "$PUBLIC_KEY" >> "$AUTH_KEYS"
     log_success "Clave pública agregada a authorized_keys ✓"
@@ -212,91 +196,11 @@ else
     log_info "Clave pública ya estaba en authorized_keys"
 fi
 
-# Asignar permisos correctos
 chmod 600 "$AUTH_KEYS" "$PRIVATE_KEY" "$PUBLIC_KEY"
 chown -R "${ADMIN_USER}:${ADMIN_USER}" "$SSH_DIR"
 
-# Mostrar la clave privada para que el usuario la guarde (SOLO si es usuario nuevo)
-if [[ "$USUARIO_NUEVO" == "true" ]]; then
-    echo ""
-    log_warning "A continuación se mostrará la LLAVE PRIVADA SSH."
-    log_warning "Debes copiarla y guardarla en tu PC Windows."
-    log_warning "Sin esta llave, no podrás conectarte al servidor."
-    echo ""
-    wait_for_user "Presiona Enter cuando estés listo para ver la llave privada..."
-
-    echo ""
-    print_separator
-    echo -e "${COLOR_BOLD_YELLOW}╔══ LLAVE PRIVADA SSH — COPIA TODO ESTE BLOQUE ══════════════╗${COLOR_RESET}"
-    echo -e "${COLOR_BOLD_YELLOW}║ Desde -----BEGIN hasta -----END incluido                   ║${COLOR_RESET}"
-    echo -e "${COLOR_BOLD_YELLOW}╚════════════════════════════════════════════════════════════╝${COLOR_RESET}"
-    echo ""
-    cat "$PRIVATE_KEY"
-    echo ""
-    print_separator
-
-    # ============================================================
-    # 6. INSTRUCCIONES PARA BITVISE (Windows)
-    # ============================================================
-    echo ""
-    windows_instruction "CÓMO GUARDAR LA LLAVE SSH EN TU PC WINDOWS
-
-1. Copia TODO el texto de la llave privada que ves arriba
-   (desde -----BEGIN RSA PRIVATE KEY----- hasta -----END RSA PRIVATE KEY-----)
-
-2. Abre el Bloc de Notas en Windows (busca 'notepad' en el menú Inicio)
-
-3. Pega el texto copiado
-
-4. Guarda el archivo con el nombre: ${ADMIN_USER}_key.pem
-   En la carpeta: C:\\Users\\TuNombre\\.ssh\\
-   (si la carpeta .ssh no existe, créala)
-
-5. Abre Bitvise SSH Client
-
-6. En el campo 'Host' ingresa la IP de tu VPS
-   (puedes verla en el panel de Contabo)
-
-7. En 'Username' ingresa: ${ADMIN_USER}
-
-8. En 'Initial method' selecciona: publickey
-
-9. Haz clic en 'Client key manager' → 'Import'
-   Selecciona el archivo ${ADMIN_USER}_key.pem que guardaste
-
-10. Regresa y haz clic en 'Log in'"
-
-echo ""
-log_warning "IMPORTANTE: No cierres esta sesión SSH de root hasta que"
-log_warning "hayas verificado que puedes conectarte con '${ADMIN_USER}'."
-echo ""
-wait_for_user "Presiona Enter SOLO cuando hayas guardado la llave y configurado Bitvise..."
-
 # ============================================================
-# 7. VERIFICAR CONEXIÓN (el usuario debe abrir nueva sesión)
-# ============================================================
-echo ""
-log_info "Ahora debes abrir una NUEVA ventana de Bitvise SSH"
-log_info "y conectarte con el usuario '${ADMIN_USER}'."
-echo ""
-log_info "Una vez conectado con '${ADMIN_USER}', ejecuta este comando:"
-echo ""
-echo -e "   ${COLOR_BOLD_CYAN}echo 'Conexion exitosa con ${ADMIN_USER}'${COLOR_RESET}"
-echo ""
-log_info "Si ves el mensaje 'Conexion exitosa', vuelve aquí y continúa."
-echo ""
-
-wait_for_user "Presiona Enter cuando hayas verificado la conexión con '${ADMIN_USER}'..."
-else
-    # Usuario ya existía — mostrar resumen rápido
-    echo ""
-    log_success "Usuario '${ADMIN_USER}' verificado y configurado correctamente ✓"
-    log_info "El usuario ya tiene acceso SSH configurado."
-    echo ""
-fi
-
-# ============================================================
-# 8. GUARDAR CONFIGURACIÓN EN HOME DEL NUEVO USUARIO
+# 6. GUARDAR CONFIGURACIÓN
 # ============================================================
 log_step "Guardando configuración de VPSfacil"
 
@@ -314,13 +218,26 @@ TIMEZONE="${TIMEZONE}"
 INSTALLATION_DATE="$(date '+%Y-%m-%d')"
 EOF
 
+# Agregar credenciales si existen
+if [[ -n "${PORTAINER_ADMIN:-}" ]]; then
+    cat >> "$CONFIG_DEST" << EOF
+PORTAINER_ADMIN="${PORTAINER_ADMIN}"
+PORTAINER_PASS="${PORTAINER_PASS}"
+KOPIA_PASS="${KOPIA_PASS}"
+EOF
+fi
+
 chmod 600 "$CONFIG_DEST"
 chown "${ADMIN_USER}:${ADMIN_USER}" "$CONFIG_DEST"
+
+# También guardar en /tmp para que setup.sh lo encuentre
+cp "$CONFIG_DEST" "/tmp/vpsfacil_setup.conf"
+chmod 600 "/tmp/vpsfacil_setup.conf"
 
 log_success "Configuración guardada en: ${CONFIG_DEST} ✓"
 
 # ============================================================
-# RESUMEN FINAL
+# RESUMEN
 # ============================================================
 echo ""
 print_separator
@@ -331,27 +248,8 @@ echo -e "  ${COLOR_BOLD_WHITE}Resumen:${COLOR_RESET}"
 echo -e "    Usuario:        ${COLOR_CYAN}${ADMIN_USER}${COLOR_RESET}"
 echo -e "    Home:           ${COLOR_CYAN}${ADMIN_HOME}${COLOR_RESET}"
 echo -e "    Apps en:        ${COLOR_CYAN}${APPS_DIR}${COLOR_RESET}"
-echo -e "    Sudo:           ${COLOR_CYAN}Sin password (para automatización)${COLOR_RESET}"
-echo -e "    SSH:            ${COLOR_CYAN}Por llave RSA 4096 bits${COLOR_RESET}"
-echo -e "    Llave privada:  ${COLOR_CYAN}${PRIVATE_KEY}${COLOR_RESET} (en el servidor)"
+echo -e "    Sudo:           ${COLOR_CYAN}Sin password${COLOR_RESET}"
+echo -e "    SSH:            ${COLOR_CYAN}RSA 4096 bits${COLOR_RESET}"
 echo ""
-echo ""
-print_separator
-echo ""
-windows_instruction "VERIFICACIÓN RÁPIDA (Opcional)
-
-Puedes verificar que la conexión funciona abriendo una nueva ventana Bitvise con:
-   Host:     IP de tu VPS
-   Puerto:   ${SSH_PORT:-22}
-   Usuario:  ${ADMIN_USER}
-   Auth:     publickey → selecciona ${ADMIN_USER}_key.pem
-
-Sin embargo, NO necesitas cambiar ahora. La instalación continuará
-en ESTA ventana (como root) con los siguientes pasos:
-   - Paso 3: Hardening SSH
-   - Paso 5: Instalar Tailscale VPN
-   - Más pasos automatizados...
-
-IMPORTANTE: Cierra la ventana de verificación Bitvise si la abriste.
-Vuelve a ESTA ventana (root) para continuar la instalación."
+log_info "La configuración de SSH se completará en el paso 11."
 echo ""

@@ -1,36 +1,50 @@
 #!/bin/bash
 # ============================================================
-# lib/progress.sh — Gestión de progreso de instalación FASE B
+# lib/progress.sh — Gestión de progreso de instalación
 # VPSfacil - Sistema Automatizado de Instalación en VPS
 # ============================================================
 
 # Variables globales
-readonly PROGRESS_LOG="/tmp/vpsfacil_core_progress.log"
-readonly PROGRESS_LOCK="/tmp/vpsfacil_core_progress.lock"
+readonly PROGRESS_LOG="/tmp/vpsfacil_progress.log"
+readonly PROGRESS_LOCK="/tmp/vpsfacil_progress.lock"
 
-# Array con los pasos core (paso_num, nombre)
+# Array con los 11 pasos de instalación
 declare -gA CORE_STEPS=(
-    [4]="Firewall UFW"
-    [6]="Docker & Docker Compose"
-    [7]="Certificados SSL (Let's Encrypt)"
-    [8]="DNS Cloudflare"
-    [9]="Portainer"
-    [10]="Kopia Backup"
-    [11]="File Browser"
+    [1]="Pre-verificaciones del Sistema"
+    [2]="Crear Usuario Administrador"
+    [3]="Firewall UFW"
+    [4]="Docker & Docker Compose"
+    [5]="Tailscale VPN"
+    [6]="Certificados SSL"
+    [7]="DNS Cloudflare"
+    [8]="Portainer"
+    [9]="Kopia Backup"
+    [10]="File Browser"
+    [11]="Finalizar: Permisos y SSH"
 )
 
 # ============================================================
 # INICIALIZAR LOG DE PROGRESO
 # ============================================================
 progress_init() {
-    # Si el log ya existe, es una reconexión
     if [[ -f "$PROGRESS_LOG" ]]; then
         log_info "Detectada instalación previa. Continuando desde donde se quedó..."
     else
-        # Crear log vacío
         > "$PROGRESS_LOG"
         log_info "Iniciando nuevo registro de progreso"
     fi
+}
+
+# ============================================================
+# VERIFICAR SI UN PASO YA FUE COMPLETADO
+# ============================================================
+progress_is_completed() {
+    local step_num="$1"
+    if [[ -f "$PROGRESS_LOG" ]]; then
+        grep -q "^PASO=${step_num}|.*STATUS=completado" "$PROGRESS_LOG" 2>/dev/null
+        return $?
+    fi
+    return 1
 }
 
 # ============================================================
@@ -38,12 +52,7 @@ progress_init() {
 # ============================================================
 progress_start_step() {
     local step_num="$1"
-    local step_name="${CORE_STEPS[$step_num]}"
-
-    local start_time=$(date '+%Y-%m-%d %H:%M:%S')
     local start_epoch=$(date +%s)
-
-    # Guardar timestamp de inicio en variable temporal
     export "STEP_${step_num}_START=$start_epoch"
 }
 
@@ -56,7 +65,8 @@ progress_complete_step() {
 
     local end_time=$(date '+%Y-%m-%d %H:%M:%S')
     local end_epoch=$(date +%s)
-    local start_epoch="${STEP_${step_num}_START:-0}"
+    local start_var="STEP_${step_num}_START"
+    local start_epoch="${!start_var:-0}"
 
     local duration=0
     if [[ $start_epoch -gt 0 ]]; then
@@ -65,8 +75,7 @@ progress_complete_step() {
 
     local duration_str=$(printf "%dm%02ds" $((duration / 60)) $((duration % 60)))
 
-    # Agregar entrada al log
-    echo "PASO=$step_num|NOMBRE=$step_name|STATUS=completado|INICIO=$start_time|FIN=$end_time|DURACION=$duration_str" >> "$PROGRESS_LOG"
+    echo "PASO=$step_num|NOMBRE=$step_name|STATUS=completado|FIN=$end_time|DURACION=$duration_str" >> "$PROGRESS_LOG"
 
     unset "STEP_${step_num}_START"
 }
@@ -81,22 +90,9 @@ progress_fail_step() {
 
     local fail_time=$(date '+%Y-%m-%d %H:%M:%S')
 
-    # Agregar entrada al log
     echo "PASO=$step_num|NOMBRE=$step_name|STATUS=fallido|FALLO=$fail_time|ERROR=$error_msg" >> "$PROGRESS_LOG"
 
     unset "STEP_${step_num}_START"
-}
-
-# ============================================================
-# OBTENER LISTA DE PASOS COMPLETADOS
-# ============================================================
-progress_get_completed() {
-    if [[ ! -f "$PROGRESS_LOG" ]]; then
-        echo ""
-        return
-    fi
-
-    grep "STATUS=completado" "$PROGRESS_LOG" | cut -d'|' -f1 | cut -d'=' -f2
 }
 
 # ============================================================
@@ -108,13 +104,16 @@ progress_get_total_duration() {
         return
     fi
 
-    # Calcular duración total de todos los pasos completados
     local total_seconds=0
-    while IFS='|' read -r step name status inicio fin duracion; do
-        if [[ "$status" == "STATUS=completado" && "$duracion" =~ ^DURACION=([0-9]+)m([0-9]+)s$ ]]; then
-            local mins="${BASH_REMATCH[1]}"
-            local secs="${BASH_REMATCH[2]}"
-            total_seconds=$((total_seconds + mins * 60 + secs))
+    while IFS='|' read -r step name status rest; do
+        if [[ "$status" == "STATUS=completado" ]]; then
+            local dur_field=""
+            dur_field=$(echo "$rest" | grep -o "DURACION=[^|]*" || echo "")
+            if [[ "$dur_field" =~ DURACION=([0-9]+)m([0-9]+)s ]]; then
+                local mins="${BASH_REMATCH[1]}"
+                local secs="${BASH_REMATCH[2]}"
+                total_seconds=$((total_seconds + mins * 60 + secs))
+            fi
         fi
     done < "$PROGRESS_LOG"
 
@@ -126,21 +125,16 @@ progress_get_total_duration() {
 # ============================================================
 progress_show() {
     local completed_count=0
-    local total_count=7  # Pasos 4, 6, 7, 8, 9, 10, 11
+    local total_count=11
 
     local completed_steps=""
     if [[ -f "$PROGRESS_LOG" ]]; then
-        # Contar líneas completadas de forma segura
         if grep -q "STATUS=completado" "$PROGRESS_LOG" 2>/dev/null; then
             completed_count=$(grep "STATUS=completado" "$PROGRESS_LOG" 2>/dev/null | wc -l | tr -d ' ')
-        else
-            completed_count=0
         fi
-        # Obtener lista de pasos completados
         completed_steps=$(grep "STATUS=completado" "$PROGRESS_LOG" 2>/dev/null | cut -d'|' -f1 | sed 's/PASO=//' | tr '\n' ' ' 2>/dev/null || echo "")
     fi
 
-    # Calcular porcentaje
     local percentage=$((completed_count * 100 / total_count))
 
     # Barra de progreso ASCII
@@ -156,30 +150,31 @@ progress_show() {
         progress_bar+="░"
     done
 
-    # Mostrar encabezado
     echo ""
     echo "╔═══════════════════════════════════════════════════════════════╗"
-    echo "║  FASE B - Instalación Core: Progreso $completed_count/$total_count ($percentage%)     ║"
+    printf "║  Instalación VPSfacil: Progreso %d/%d (%d%%)                  ║\n" "$completed_count" "$total_count" "$percentage"
     echo "╠═══════════════════════════════════════════════════════════════╣"
     echo "║                                                               ║"
-    echo "║  [$progress_bar] $percentage%                   ║"
+    printf "║  [%s] %d%%                                ║\n" "$progress_bar" "$percentage"
     echo "║                                                               ║"
     echo "╠═══════════════════════════════════════════════════════════════╣"
 
-    # Mostrar estado de cada paso
-    for step_num in 4 6 7 8 9 10 11; do
+    for step_num in 1 2 3 4 5 6 7 8 9 10 11; do
         local step_name="${CORE_STEPS[$step_num]}"
-        local status="⏸"
+        local status_icon="⏸"
         local info="[en espera]"
 
-        # Buscar si el paso está completado
         if [[ " $completed_steps " =~ " $step_num " ]]; then
-            status="✓"
+            status_icon="✓"
             local duration=$(grep "^PASO=$step_num|" "$PROGRESS_LOG" 2>/dev/null | grep "STATUS=completado" 2>/dev/null | tail -1 | grep -o "DURACION=[^|]*" 2>/dev/null | cut -d'=' -f2 || echo "")
-            info="[completado en $duration]"
+            if [[ -n "$duration" ]]; then
+                info="[completado $duration]"
+            else
+                info="[completado]"
+            fi
         fi
 
-        printf "║  %-1s Paso %-2d: %-35s %s  ║\n" "$status" "$step_num" "$step_name" "$info"
+        printf "║  %-1s Paso %-2d: %-35s %s  ║\n" "$status_icon" "$step_num" "$step_name" "$info"
     done
 
     echo "║                                                               ║"
@@ -188,7 +183,7 @@ progress_show() {
 }
 
 # ============================================================
-# LIMPIAR PROGRESO (para reintentos completos)
+# LIMPIAR PROGRESO
 # ============================================================
 progress_reset() {
     rm -f "$PROGRESS_LOG"

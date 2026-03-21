@@ -3,8 +3,8 @@
 # lib/config.sh — Variables globales y configuración central
 # VPSfacil - Sistema Automatizado de Instalación en VPS
 #
-# Este archivo se carga SIEMPRE como primer paso en todos los
-# scripts. Define las variables que usan todos los demás.
+# Define variables globales para la instalación core.
+# Apps opcionales (N8N, OpenClaw) no están incluidas aquí.
 #
 # Orden de carga:
 #   1. lib/colors.sh   → colores y print_header
@@ -178,11 +178,9 @@ _derive_config_vars() {
     export VPN_SUBDOMAIN="vpn.${DOMAIN}"              # vpn.agentexperto.work
     export CF_WILDCARD="*.vpn.${DOMAIN}"              # *.vpn.agentexperto.work
 
-    # URLs de cada aplicación (via Tailscale VPN)
+    # URLs de aplicaciones core (via Tailscale VPN)
     export URL_PORTAINER="https://portainer.vpn.${DOMAIN}:9443"
-    export URL_N8N="https://n8n.vpn.${DOMAIN}:5678"
     export URL_FILEBROWSER="http://files.vpn.${DOMAIN}:8080"
-    export URL_OPENCLAW="https://openclaw.vpn.${DOMAIN}:18789"
     export URL_KOPIA="https://kopia.vpn.${DOMAIN}:51515"
 
     # Configuración de archivos de certificado
@@ -232,19 +230,13 @@ EOF
 readonly PORT_SSH="22"
 readonly PORT_TAILSCALE="41641"
 readonly PORT_PORTAINER="9443"
-readonly PORT_N8N="5678"
 readonly PORT_FILEBROWSER="8080"
-readonly PORT_OPENCLAW_WS="18789"
-readonly PORT_OPENCLAW_HTTP="18790"
 readonly PORT_KOPIA="51515"
 
-# Imágenes Docker (versiones fijadas para reproducibilidad)
+# Imágenes Docker core
 readonly IMG_PORTAINER="portainer/portainer-ce:latest"
-readonly IMG_N8N="docker.n8n.io/n8nio/n8n:latest"
-readonly IMG_POSTGRES="postgres:16-alpine"
 readonly IMG_FILEBROWSER="filebrowser/filebrowser:latest"
 readonly IMG_KOPIA="kopia/kopia:latest"
-readonly IMG_OPENCLAW="node:24-bookworm"
 
 # Timeouts (en segundos)
 readonly TIMEOUT_DOCKER_START=60

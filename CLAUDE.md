@@ -161,55 +161,26 @@ Todas las aplicaciones se instalan bajo `/home/${ADMIN_USER}/apps/`:
 
 ---
 
-## Orden de Instalación (Corregido y Definitivo)
+## Orden de Instalación (Fase Única como Root)
 
-### FASE 1 — Preparación del sistema (como root)
+**Arquitectura simplificada:** Todo se ejecuta como root en una sola sesión SSH.
+El usuario admin se crea al inicio, el hardening SSH se aplica al final.
 
-| Script | Descripción |
-|--------|-------------|
-| `00_precheck.sh` | Verificar OS Debian 12, internet, espacio en disco, instalar dependencias base |
-| `01_create_user.sh` | Crear usuario admin, SSH key, agregar a sudo, configurar sudo sin password |
-| `02_secure_ssh.sh` | Deshabilitar login root SSH — **PAUSA**: verificar conexión con nuevo usuario |
+| Paso | Script | Descripción |
+|------|--------|-------------|
+| 1 | `00_precheck.sh` | Verificar OS Debian 12, internet, espacio en disco, dependencias |
+| 2 | `01_create_user.sh` | Crear usuario admin, SSH key, sudo NOPASSWD, directorios |
+| 3 | `03_install_firewall.sh` | UFW + fix crítico Docker/UFW (iptables=false) |
+| 4 | `04_install_docker.sh` | Docker CE + Docker Compose v2, agregar usuario a grupo docker |
+| 5 | `05_install_tailscale.sh` | Instalar Tailscale, autenticar, obtener IP VPN (100.x.x.x) |
+| 6 | `06_setup_certificates.sh` | Certificados Let's Encrypt wildcard vía DNS-01 |
+| 7 | `07_setup_dns.sh` | Crear registros DNS en Cloudflare (*.vpn.DOMAIN → Tailscale IP) |
+| 8 | `08_install_portainer.sh` | Portainer CE vía Docker (acceso solo vía VPN) |
+| 9 | `09_install_kopia.sh` | Kopia Backup vía Docker, schedule automático |
+| 10 | `10_install_filebrowser.sh` | File Browser web (acceso VPN) |
+| 11 | `11_finalize.sh` | Barrido de permisos, verificar SSH del admin, hardening SSH, fail2ban |
 
-### FASE 2 — Seguridad base (como admin user)
-
-| Script | Descripción |
-|--------|-------------|
-| `03_install_firewall.sh` | UFW + fix crítico Docker/UFW (iptables=false), fail2ban |
-| `04_install_docker.sh` | Docker CE + Docker Compose v2, agregar usuario a grupo docker |
-
-### FASE 3 — Red privada y certificados (como admin user)
-
-| Script | Descripción |
-|--------|-------------|
-| `05_install_tailscale.sh` | Instalar Tailscale, autenticar, obtener IP VPN (100.x.x.x) |
-| `06_setup_certificates.sh` | Guiar obtención de Let's Encrypt (wildcard), subir al VPS |
-| `07_setup_dns.sh` | Crear registros DNS en Cloudflare vía API (*.vpn.DOMAIN → Tailscale IP) |
-
-### FASE 4 — Gestión de contenedores (como admin user)
-
-| Script | Descripción |
-|--------|-------------|
-| `08_install_portainer.sh` | Portainer CE vía Docker (acceso solo vía VPN) |
-
-### FASE 5 — Backup (como admin user)
-
-| Script | Descripción |
-|--------|-------------|
-| `09_install_kopia.sh` | Kopia Backup vía Docker, configurar schedule automático |
-
-### FASE 6 — Gestor de archivos (como admin user)
-
-| Script | Descripción |
-|--------|-------------|
-| `10_install_filebrowser.sh` | File Browser web (gestor de archivos con acceso VPN) |
-
-### FASE 7 — Aplicaciones opcionales (menú interactivo)
-
-| Script | Descripción |
-|--------|-------------|
-| `apps/n8n.sh` | N8N + PostgreSQL 16 (automatización de flujos) |
-| `apps/openclaw.sh` | OpenClaw (asistente IA, solo VPN, credenciales Claude) |
+**Nota:** Las aplicaciones opcionales (N8N, OpenClaw) se instalarán con un script separado en el futuro.
 
 ---
 
@@ -280,41 +251,31 @@ Los navegadores modernos requieren certificados SSL válidos para URLs HTTPS, in
 VPSfacil/
 ├── CLAUDE.md                        # Documentación del proyecto (este archivo)
 ├── README.md                        # Guía de usuario
-├── setup.sh                         # Script principal (descargado por curl)
+├── setup.sh                         # Script principal autocontenido (descargado por curl)
 ├── .gitignore                       # Protege secretos de subir a GitHub
 │
-├── scripts/                         # Módulos de instalación core
-│   ├── 00_precheck.sh               # Verificaciones previas + dependencias
-│   ├── 01_create_user.sh            # Crear usuario admin
-│   ├── 02_secure_ssh.sh             # Hardening SSH
-│   ├── 03_install_firewall.sh       # UFW + fix Docker/UFW
-│   ├── 04_install_docker.sh         # Docker CE + Compose v2
-│   ├── 05_install_tailscale.sh      # Tailscale VPN
-│   ├── 06_setup_certificates.sh     # Let's Encrypt (wildcard)s
-│   ├── 07_setup_dns.sh              # DNS Cloudflare vía API
-│   ├── 08_install_portainer.sh      # Portainer CE
-│   ├── 09_install_kopia.sh          # Kopia Backup
-│   └── 10_install_filebrowser.sh    # File Browser web
+├── scripts/                         # Módulos de instalación core (11 pasos)
+│   ├── 00_precheck.sh               # Paso 1: Verificaciones previas + dependencias
+│   ├── 01_create_user.sh            # Paso 2: Crear usuario admin (sin hardening SSH)
+│   ├── 03_install_firewall.sh       # Paso 3: UFW + fix Docker/UFW
+│   ├── 04_install_docker.sh         # Paso 4: Docker CE + Compose v2
+│   ├── 05_install_tailscale.sh      # Paso 5: Tailscale VPN
+│   ├── 06_setup_certificates.sh     # Paso 6: Certificados Let's Encrypt
+│   ├── 07_setup_dns.sh              # Paso 7: DNS Cloudflare vía API
+│   ├── 08_install_portainer.sh      # Paso 8: Portainer CE
+│   ├── 09_install_kopia.sh          # Paso 9: Kopia Backup
+│   ├── 10_install_filebrowser.sh    # Paso 10: File Browser web
+│   └── 11_finalize.sh               # Paso 11: Permisos + hardening SSH + fail2ban
 │
-├── apps/                            # Instaladores de aplicaciones opcionales
+├── apps/                            # Instaladores de apps opcionales (futuro, script separado)
 │   ├── n8n.sh                       # N8N + PostgreSQL
 │   └── openclaw.sh                  # OpenClaw IA
-│
-├── templates/                       # Plantillas Docker Compose
-│   ├── n8n/
-│   │   └── docker-compose.yml
-│   ├── openclaw/
-│   │   └── docker-compose.yml
-│   ├── portainer/
-│   │   └── docker-compose.yml
-│   └── kopia/
-│       └── docker-compose.yml
 │
 ├── lib/                             # Funciones reutilizables
 │   ├── colors.sh                    # Definiciones de colores ANSI
 │   ├── utils.sh                     # Utilidades comunes bash
 │   ├── config.sh                    # Variables globales y configuración
-│   ├── menu.sh                      # Sistema de menú interactivo
+│   ├── progress.sh                  # Tracking de progreso visual (11 pasos)
 │   ├── portainer_api.sh             # Wrappers REST API de Portainer
 │   └── cloudflare_api.sh            # Wrappers API DNS de Cloudflare
 │
@@ -326,14 +287,15 @@ VPSfacil/
 
 ## Contexto Crítico: ROOT vs ADMIN_USER
 
-**IMPORTANTE:** Después de crear el usuario admin en `01_create_user.sh`:
-- Todas las instalaciones posteriores corren bajo el usuario admin, NO root
-- Solo la preparación inicial (precheck, crear usuario, hardening SSH) usa root
-- Docker debe ser accesible por el usuario admin (agregado al grupo docker)
-- Todos los contenedores son desplegados por el usuario admin
-- El acceso SSH al VPS será vía usuario admin después del setup
+**Arquitectura de fase única:** Todo se ejecuta como root en una sola sesión SSH.
 
-El usuario admin tiene acceso sudo sin password para permitir pasos de instalación automatizados.
+- El usuario admin se crea en el paso 2 (`01_create_user.sh`)
+- Todos los pasos 1-10 se ejecutan como root (sin cambio de usuario)
+- El paso 11 (`11_finalize.sh`) hace un barrido de permisos (`chown -R`) para asegurar que el admin sea dueño de todo en `/home/ADMIN_USER/`
+- El hardening SSH (deshabilitar root) se aplica en el paso 11 — **DESPUÉS** de verificar que el usuario admin puede conectarse
+- Después de la instalación, el usuario admin accede vía SSH con llave
+
+El usuario admin tiene acceso sudo sin password para gestionar Docker y el sistema después de la instalación.
 
 ---
 
@@ -506,10 +468,12 @@ TZ=America/Santiago             # Zona horaria
 
 ## Estado del Proyecto
 
-- [x] Arquitectura definida
+- [x] Arquitectura definida (fase única como root)
 - [x] Estructura de carpetas creada
 - [x] CLAUDE.md actualizado
 - [x] GitHub configurado
-- [ ] Scripts en desarrollo
+- [x] Scripts core en desarrollo (pasos 1-11)
+- [ ] Pruebas en VPS fresco
+- [ ] Script de apps opcionales (futuro, separado)
 
-**Próximo paso:** Escribir scripts comenzando por `lib/colors.sh` → `lib/utils.sh` → `setup.sh` → scripts en orden 00-09 → apps opcionales.
+**Arquitectura v2:** Fase única como root, 11 pasos secuenciales, hardening SSH al final.
