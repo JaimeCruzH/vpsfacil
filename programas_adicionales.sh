@@ -108,6 +108,90 @@ show_menu() {
 }
 
 # ============================================================
+# UTILIDAD: CREAR REGISTRO DNS EN CLOUDFLARE
+# Reutiliza las credenciales guardadas en el paso 6 (DNS core).
+# Uso: _create_dns_record "openclaw"   → crea openclaw.vpn.DOMAIN
+# ============================================================
+_create_dns_record() {
+    local subdomain_prefix="$1"
+    local fqdn="${subdomain_prefix}.vpn.${DOMAIN}"
+
+    # Cargar credenciales de Cloudflare guardadas en el paso 6
+    local CF_ENV_FILE="${APPS_DIR}/.cloudflare.env"
+    if [[ ! -f "$CF_ENV_FILE" ]]; then
+        log_warning "No se encontraron credenciales de Cloudflare (${CF_ENV_FILE})"
+        log_info    "Crea manualmente el registro DNS: ${fqdn} → IP Tailscale"
+        return 1
+    fi
+    # shellcheck source=/dev/null
+    source "$CF_ENV_FILE"
+
+    if [[ -z "${CF_API_TOKEN:-}" || -z "${CF_ZONE_ID:-}" ]]; then
+        log_warning "Credenciales de Cloudflare incompletas en ${CF_ENV_FILE}"
+        log_info    "Crea manualmente el registro DNS: ${fqdn} → IP Tailscale"
+        return 1
+    fi
+
+    # Obtener la IP de Tailscale actual del servidor
+    local TAILSCALE_IP
+    TAILSCALE_IP=$(tailscale ip -4 2>/dev/null || echo "")
+    if [[ -z "$TAILSCALE_IP" ]]; then
+        log_warning "No se pudo obtener la IP de Tailscale"
+        log_info    "Crea manualmente el registro DNS: ${fqdn} → IP Tailscale"
+        return 1
+    fi
+
+    log_process "Creando registro DNS: ${fqdn} → ${TAILSCALE_IP} ..."
+
+    # Verificar si el registro ya existe
+    local EXISTING
+    EXISTING=$(curl -s -X GET \
+        "https://api.cloudflare.com/client/v4/zones/${CF_ZONE_ID}/dns_records?name=${fqdn}&type=A" \
+        -H "Authorization: Bearer ${CF_API_TOKEN}" \
+        -H "Content-Type: application/json")
+
+    local EXISTING_ID
+    EXISTING_ID=$(echo "$EXISTING" | python3 -c \
+        "import sys,json; d=json.load(sys.stdin); r=d.get('result',[]); print(r[0]['id'] if r else '')" \
+        2>/dev/null || echo "")
+
+    local RESULT ACCION
+    if [[ -n "$EXISTING_ID" ]]; then
+        RESULT=$(curl -s -X PUT \
+            "https://api.cloudflare.com/client/v4/zones/${CF_ZONE_ID}/dns_records/${EXISTING_ID}" \
+            -H "Authorization: Bearer ${CF_API_TOKEN}" \
+            -H "Content-Type: application/json" \
+            --data "{\"type\":\"A\",\"name\":\"${fqdn}\",\"content\":\"${TAILSCALE_IP}\",\"ttl\":120,\"proxied\":false}")
+        ACCION="Actualizado"
+    else
+        RESULT=$(curl -s -X POST \
+            "https://api.cloudflare.com/client/v4/zones/${CF_ZONE_ID}/dns_records" \
+            -H "Authorization: Bearer ${CF_API_TOKEN}" \
+            -H "Content-Type: application/json" \
+            --data "{\"type\":\"A\",\"name\":\"${fqdn}\",\"content\":\"${TAILSCALE_IP}\",\"ttl\":120,\"proxied\":false}")
+        ACCION="Creado"
+    fi
+
+    local SUCCESS
+    SUCCESS=$(echo "$RESULT" | python3 -c \
+        "import sys,json; d=json.load(sys.stdin); print('true' if d.get('success') else 'false')" \
+        2>/dev/null || echo "false")
+
+    if [[ "$SUCCESS" == "true" ]]; then
+        log_success "${ACCION}: ${fqdn} → ${TAILSCALE_IP} ✓"
+        return 0
+    else
+        local ERR
+        ERR=$(echo "$RESULT" | python3 -c \
+            "import sys,json; d=json.load(sys.stdin); e=d.get('errors',[]); print(e[0].get('message','desconocido') if e else 'desconocido')" \
+            2>/dev/null || echo "desconocido")
+        log_warning "Error creando registro DNS: ${ERR}"
+        log_info    "Crea manualmente en Cloudflare: ${fqdn} → ${TAILSCALE_IP}"
+        return 1
+    fi
+}
+
+# ============================================================
 # INSTALADOR: OPENCLAW
 # ============================================================
 install_openclaw() {
@@ -345,6 +429,10 @@ EOF
     wait_for_port "localhost" "${PORT_OPENCLAW_WS}" 120
 
     log_success "OpenClaw está corriendo ✓"
+
+    # ── DNS en Cloudflare ─────────────────────────────────────
+    log_step "Creando registro DNS en Cloudflare"
+    _create_dns_record "openclaw" || true
 
     # ── Resumen ───────────────────────────────────────────────
     echo ""
