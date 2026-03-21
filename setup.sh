@@ -845,8 +845,9 @@ set -euo pipefail
 REPO_RAW="https://raw.githubusercontent.com/JaimeCruzH/vpsfacil/main"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)" || SCRIPT_DIR=""
 
-# Si el directorio scripts no existe, asumir que es ejecución remota
-if [[ -z "$SCRIPT_DIR" || ! -d "${SCRIPT_DIR}/scripts" ]]; then
+# Solo usar scripts locales si es un repo git completo (desarrollo local)
+# En producción (VPS), siempre descargar scripts frescos de GitHub
+if [[ -z "$SCRIPT_DIR" || ! -d "${SCRIPT_DIR}/.git" ]]; then
     SCRIPT_DIR=""
 fi
 
