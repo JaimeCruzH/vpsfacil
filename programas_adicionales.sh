@@ -301,16 +301,13 @@ DOCKERFILE
     # ── 6. Docker Compose ─────────────────────────────────────
     log_step "Generando docker-compose.yml"
 
-    # Obtener IP de Tailscale del host para pasarla al contenedor
-    local TAILSCALE_IP_HOST
-    TAILSCALE_IP_HOST=$(tailscale ip -4 2>/dev/null || echo "")
-
     local COMPOSE_CONTENT
     COMPOSE_CONTENT=$(cat << EOF
 # ============================================================
 # OpenClaw — VPSfacil
 # Acceso: http://openclaw.vpn.${DOMAIN}:${PORT_OPENCLAW_WS}
 # SOLO vía Tailscale VPN
+# El acceso VPN está gestionado por UFW + DNS, no por tailscale serve.
 # ============================================================
 services:
   openclaw:
@@ -323,15 +320,12 @@ services:
       TZ: ${TIMEZONE:-America/Santiago}
       OPENCLAW_GATEWAY_TOKEN: "${GATEWAY_TOKEN}"
       OPENCLAW_ALLOW_INSECURE_PRIVATE_WS: "true"
-      TAILSCALE_IP: "${TAILSCALE_IP_HOST}"
     ports:
       - "${PORT_OPENCLAW_WS}:18789"
       - "${PORT_OPENCLAW_HTTP}:18790"
     volumes:
       - ${APP_DIR}/config:/home/node/.openclaw
       - ${APP_DIR}/data:/home/node/.openclaw/workspace
-      - /usr/bin/tailscale:/usr/bin/tailscale:ro
-      - /var/run/tailscale/tailscaled.sock:/var/run/tailscale/tailscaled.sock
     healthcheck:
       test: ["CMD", "nc", "-z", "localhost", "18789"]
       interval: 30s
@@ -393,6 +387,15 @@ EOF
     log_info "(WhatsApp, Telegram, Slack, Discord, etc.)."
     echo ""
     if confirm "¿Deseas ejecutar el onboarding ahora?"; then
+        echo ""
+        echo -e "${COLOR_BOLD_YELLOW}┌─ OPCIONES IMPORTANTES DEL ONBOARDING ───────────────────┐${COLOR_RESET}"
+        echo -e "${COLOR_BOLD_YELLOW}│${COLOR_RESET}"
+        echo -e "${COLOR_BOLD_YELLOW}│${COLOR_RESET}  Gateway bind    → elige ${COLOR_BOLD_WHITE}0.0.0.0${COLOR_RESET} o ${COLOR_BOLD_WHITE}localhost${COLOR_RESET}"
+        echo -e "${COLOR_BOLD_YELLOW}│${COLOR_RESET}  Gateway auth    → elige ${COLOR_BOLD_WHITE}Token${COLOR_RESET}"
+        echo -e "${COLOR_BOLD_YELLOW}│${COLOR_RESET}  Tailscale       → elige ${COLOR_BOLD_WHITE}None${COLOR_RESET} (el acceso VPN ya está"
+        echo -e "${COLOR_BOLD_YELLOW}│${COLOR_RESET}                    gestionado por DNS + UFW)"
+        echo -e "${COLOR_BOLD_YELLOW}│${COLOR_RESET}"
+        echo -e "${COLOR_BOLD_YELLOW}└──────────────────────────────────────────────────────────┘${COLOR_RESET}"
         echo ""
         log_process "Iniciando onboarding de OpenClaw..."
         echo ""
