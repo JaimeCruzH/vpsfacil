@@ -34,12 +34,14 @@ if [[ -z "$SCRIPT_DIR" ]] || [[ ! -f "${LIB_DIR}/colors.sh" ]]; then
     curl -sSL "${REPO_RAW}/lib/colors.sh"  -o "${LIB_DIR}/colors.sh"
     curl -sSL "${REPO_RAW}/lib/config.sh"  -o "${LIB_DIR}/config.sh"
     curl -sSL "${REPO_RAW}/lib/utils.sh"   -o "${LIB_DIR}/utils.sh"
+    curl -sSL "${REPO_RAW}/lib/portainer_api.sh" -o "${LIB_DIR}/portainer_api.sh" 2>/dev/null || true
 fi
 
 source "${LIB_DIR}/colors.sh"
 source "${LIB_DIR}/config.sh"
 source "${LIB_DIR}/utils.sh"
 source_config
+source "${LIB_DIR}/portainer_api.sh" 2>/dev/null || true
 
 # ============================================================
 print_header "Paso 11 de 11 — Finalizar: Permisos y Seguridad SSH"
@@ -95,7 +97,66 @@ else
 fi
 
 # ============================================================
-# 3. VERIFICAR LLAVE SSH DEL USUARIO ADMIN
+# 3. MIGRAR STACKS A PORTAINER (Limited → Editable)
+# ============================================================
+log_step "Registrando stacks en Portainer como editables"
+
+if portainer_load_creds 2>/dev/null; then
+    JWT=$(portainer_login "$PORTAINER_USER" "$PORTAINER_PASS" 2>/dev/null) || JWT=""
+    if [[ -n "$JWT" ]]; then
+        ENDPOINT_ID=$(portainer_endpoint_id "$JWT")
+
+        for stack_name in kopia filebrowser; do
+            APP_COMPOSE="${APPS_DIR}/${stack_name}/docker-compose.yml"
+            if [[ ! -f "$APP_COMPOSE" ]]; then
+                continue
+            fi
+
+            # Verificar si ya existe como stack gestionado en Portainer
+            EXISTING_STACKS=$(curl -sk -X GET "${PORTAINER_URL}/api/stacks" \
+                -H "Authorization: Bearer ${JWT}" 2>/dev/null)
+            STACK_ID=$(echo "$EXISTING_STACKS" | \
+                jq -r --arg name "$stack_name" \
+                '.[] | select(.Name==$name) | .Id' 2>/dev/null || echo "")
+
+            if [[ -n "$STACK_ID" ]]; then
+                # Ya existe en Portainer — verificar si es Limited (Type=2 es compose standalone)
+                STACK_TYPE=$(echo "$EXISTING_STACKS" | \
+                    jq -r --arg name "$stack_name" \
+                    '.[] | select(.Name==$name) | .Type' 2>/dev/null || echo "")
+                # Si es tipo 2 (standalone) y el Status es activo, ya está gestionado
+                log_info "${stack_name}: ya registrado en Portainer (ID: ${STACK_ID})"
+                continue
+            fi
+
+            # No existe como stack gestionado — detener contenedor y crear via API
+            log_process "Migrando ${stack_name} a stack editable..."
+
+            # Detener el contenedor creado por docker compose
+            cd "${APPS_DIR}/${stack_name}" 2>/dev/null || continue
+            docker compose down 2>/dev/null || true
+
+            # Crear via API de Portainer (esto lo hace editable)
+            COMPOSE_CONTENT=$(cat "$APP_COMPOSE")
+            if portainer_stack_deploy "$JWT" "$ENDPOINT_ID" "$stack_name" "$COMPOSE_CONTENT"; then
+                log_success "${stack_name}: migrado a stack editable ✓"
+            else
+                # Fallback: volver a levantar con docker compose
+                log_warning "${stack_name}: no se pudo migrar, restaurando..."
+                docker compose up -d 2>/dev/null || true
+            fi
+        done
+    else
+        log_warning "No se pudo conectar con Portainer API. Stacks no migrados."
+    fi
+else
+    log_warning "Credenciales de Portainer no encontradas. Stacks no migrados."
+fi
+
+echo ""
+
+# ============================================================
+# 4. VERIFICAR LLAVE SSH
 # ============================================================
 log_step "Verificando llave SSH"
 
@@ -110,7 +171,7 @@ fi
 log_success "Llave SSH de '${ADMIN_USER}' verificada ✓"
 
 # ============================================================
-# 4. INSTRUCCIONES DE BITVISE PARA WINDOWS
+# 5. INSTRUCCIONES DE BITVISE PARA WINDOWS
 # ============================================================
 echo ""
 print_separator
@@ -174,7 +235,7 @@ if ! confirm "¿Pudiste conectarte exitosamente como '${ADMIN_USER}' vía SSH?";
 fi
 
 # ============================================================
-# 5. HARDENING SSH
+# 6. HARDENING SSH
 # ============================================================
 echo ""
 log_step "Aplicando seguridad SSH"
@@ -225,7 +286,7 @@ set_ssh_option "AllowUsers" "${ADMIN_USER}"
 log_success "Configuraciones de seguridad aplicadas ✓"
 
 # ============================================================
-# 6. INSTALAR FAIL2BAN
+# 7. INSTALAR FAIL2BAN
 # ============================================================
 log_step "Instalando fail2ban (protección contra fuerza bruta)"
 
@@ -254,7 +315,7 @@ systemctl restart fail2ban > /dev/null 2>&1
 log_success "Fail2ban instalado y configurado ✓"
 
 # ============================================================
-# 7. VERIFICAR Y RECARGAR SSH
+# 8. VERIFICAR Y RECARGAR SSH
 # ============================================================
 log_step "Verificando y aplicando nueva configuración SSH"
 
