@@ -271,7 +271,7 @@ EOF
     cat > "${APP_DIR}/Dockerfile" << 'DOCKERFILE'
 FROM node:24-bookworm
 
-RUN corepack enable pnpm && pnpm add -g openclaw@latest
+RUN npm install -g openclaw@latest --unsafe-perm
 
 USER node
 WORKDIR /home/node
@@ -288,7 +288,11 @@ DOCKERFILE
     log_process "Puede tardar 3-5 minutos la primera vez..."
 
     cd "$APP_DIR"
-    docker build -t openclaw-vpsfacil:latest . 2>&1 | tail -10
+    if ! docker build --progress=plain -t openclaw-vpsfacil:latest . 2>&1; then
+        log_error "Falló la construcción de la imagen Docker."
+        log_info  "Revisa el error arriba para más detalles."
+        return 1
+    fi
     log_success "Imagen openclaw-vpsfacil:latest construida ✓"
 
     # ── 6. Docker Compose ─────────────────────────────────────
