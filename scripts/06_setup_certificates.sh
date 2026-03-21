@@ -41,6 +41,10 @@ if [[ -z "$SCRIPT_DIR" ]] || [[ ! -f "${LIB_DIR}/colors.sh" ]]; then
     curl -sSL "${REPO_RAW}/lib/portainer_api.sh" -o "${LIB_DIR}/portainer_api.sh" 2>/dev/null || true
 fi
 
+source "${LIB_DIR}/colors.sh"
+source "${LIB_DIR}/config.sh"
+source "${LIB_DIR}/utils.sh"
+source_config
 
 # ============================================================
 print_header "Paso 6 de 11 — Certificados SSL (Let's Encrypt)"
