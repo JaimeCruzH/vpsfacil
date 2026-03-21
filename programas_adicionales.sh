@@ -271,14 +271,17 @@ EOF
     cat > "${APP_DIR}/Dockerfile" << 'DOCKERFILE'
 FROM node:24-bookworm
 
-RUN npm install -g openclaw@latest --unsafe-perm
+ENV PNPM_HOME="/pnpm"
+ENV PATH="${PNPM_HOME}:${PATH}"
+
+RUN corepack enable pnpm && pnpm add -g openclaw@latest
 
 USER node
 WORKDIR /home/node
 
 EXPOSE 18789 18790
 
-CMD ["node", "/usr/local/lib/node_modules/openclaw/openclaw.mjs", "gateway", "--allow-unconfigured"]
+CMD ["/pnpm/openclaw", "gateway", "--allow-unconfigured"]
 DOCKERFILE
 
     chown "${ADMIN_USER}:${ADMIN_USER}" "${APP_DIR}/Dockerfile"
@@ -386,13 +389,13 @@ EOF
         echo ""
         log_process "Iniciando onboarding de OpenClaw..."
         echo ""
-        docker exec -it openclaw node openclaw.mjs onboard
+        docker exec -it openclaw /pnpm/openclaw onboard
         echo ""
         log_success "Onboarding completado."
     else
         echo ""
         log_info "Puedes ejecutarlo más tarde con:"
-        log_info "  docker exec -it openclaw node openclaw.mjs onboard"
+        log_info "  docker exec -it openclaw /pnpm/openclaw onboard"
     fi
     echo ""
 
