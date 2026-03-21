@@ -636,15 +636,15 @@ readonly DOCKER_MIN_VERSION="24"
 ask_all_config() {
     print_header "Configuración Inicial"
 
-    log_info "Antes de instalar, necesitamos algunos datos."
-    log_info "Todas las preguntas se hacen ahora — después, la instalación"
-    log_info "corre sin interrupciones (excepto Cloudflare y Tailscale)."
+    log_info "Solo 3 preguntas antes de empezar."
+    log_info "Después, la instalación corre sin interrupciones"
+    log_info "(excepto Cloudflare y Tailscale que requieren interacción)."
     echo ""
     print_separator
     echo ""
 
     # --- Pregunta 1: Dominio ---
-    echo -e "${COLOR_BOLD_WHITE}PREGUNTA 1 de 6 — Dominio${COLOR_RESET}"
+    echo -e "${COLOR_BOLD_WHITE}PREGUNTA 1 de 3 — Dominio${COLOR_RESET}"
     echo ""
     log_info "Escribe el nombre de tu dominio principal."
     log_info "Ejemplos: agentexperto.work  |  miempresa.com  |  startup.io"
@@ -665,7 +665,7 @@ ask_all_config() {
     echo ""
 
     # --- Pregunta 2: Usuario admin ---
-    echo -e "${COLOR_BOLD_WHITE}PREGUNTA 2 de 6 — Usuario administrador${COLOR_RESET}"
+    echo -e "${COLOR_BOLD_WHITE}PREGUNTA 2 de 3 — Usuario administrador${COLOR_RESET}"
     echo ""
     log_info "Este usuario reemplazará a 'root' como administrador del servidor."
     log_info "Usa solo letras minúsculas, números y guión bajo (sin espacios)."
@@ -701,7 +701,7 @@ ask_all_config() {
     echo ""
 
     # --- Pregunta 3: Contraseña admin ---
-    echo -e "${COLOR_BOLD_WHITE}PREGUNTA 3 de 6 — Contraseña del usuario admin${COLOR_RESET}"
+    echo -e "${COLOR_BOLD_WHITE}PREGUNTA 2b — Contraseña del usuario admin${COLOR_RESET}"
     echo ""
     log_info "Define una contraseña para el usuario '${ADMIN_USER}'."
     log_warning "Guarda esta contraseña en un lugar seguro."
@@ -724,59 +724,17 @@ ask_all_config() {
     echo ""
 
     # --- Pregunta 4: Zona horaria ---
-    echo -e "${COLOR_BOLD_WHITE}PREGUNTA 4 de 6 — Zona horaria${COLOR_RESET}"
+    echo -e "${COLOR_BOLD_WHITE}PREGUNTA 3 de 3 — Zona horaria${COLOR_RESET}"
     echo ""
     log_info "Define la zona horaria del servidor (afecta logs y backups)."
     log_info "Ejemplos: America/Santiago  |  America/Bogota  |  America/Mexico_City"
     echo ""
     TIMEZONE=$(prompt_input "¿Cuál es tu zona horaria?" "America/Santiago")
 
-    echo ""
-    print_separator
-    echo ""
-
-    # --- Pregunta 5: Portainer ---
-    echo -e "${COLOR_BOLD_WHITE}PREGUNTA 5 de 6 — Credenciales de Portainer${COLOR_RESET}"
-    echo ""
-    log_info "Portainer es el panel web para gestionar contenedores Docker."
-    echo ""
-    PORTAINER_ADMIN=$(prompt_input "Usuario Portainer" "admin")
-    echo ""
-
-    while true; do
-        PORTAINER_PASS=$(prompt_password "Contraseña para ${PORTAINER_ADMIN} en Portainer")
-        PORTAINER_PASS2=$(prompt_password "Confirma la contraseña")
-        if [[ "$PORTAINER_PASS" == "$PORTAINER_PASS2" && ${#PORTAINER_PASS} -ge 8 ]]; then
-            break
-        elif [[ "$PORTAINER_PASS" != "$PORTAINER_PASS2" ]]; then
-            log_warning "Las contraseñas no coinciden."
-        else
-            log_warning "Mínimo 8 caracteres."
-        fi
-    done
-
-    echo ""
-    print_separator
-    echo ""
-
-    # --- Pregunta 6: Kopia ---
-    echo -e "${COLOR_BOLD_WHITE}PREGUNTA 6 de 6 — Contraseña de cifrado Kopia${COLOR_RESET}"
-    echo ""
-    log_warning "Esta contraseña cifra tus backups. Guárdala en un lugar seguro."
-    log_info "SIN ella, no podrás restaurar tus backups."
-    echo ""
-
-    while true; do
-        KOPIA_PASS=$(prompt_password "Contraseña para cifrar backups de Kopia")
-        KOPIA_PASS2=$(prompt_password "Confirma la contraseña")
-        if [[ "$KOPIA_PASS" == "$KOPIA_PASS2" && ${#KOPIA_PASS} -ge 8 ]]; then
-            break
-        elif [[ "$KOPIA_PASS" != "$KOPIA_PASS2" ]]; then
-            log_warning "Las contraseñas no coinciden."
-        else
-            log_warning "Mínimo 8 caracteres."
-        fi
-    done
+    # Portainer y Kopia usan las mismas credenciales del admin
+    PORTAINER_ADMIN="$ADMIN_USER"
+    PORTAINER_PASS="$ADMIN_PASS"
+    KOPIA_PASS="$ADMIN_PASS"
 
     echo ""
     print_separator
@@ -791,9 +749,8 @@ ask_all_config() {
     echo -e "   ${COLOR_BOLD_WHITE}Home:${COLOR_RESET}             ${COLOR_CYAN}/home/${ADMIN_USER}${COLOR_RESET}"
     echo -e "   ${COLOR_BOLD_WHITE}Apps en:${COLOR_RESET}          ${COLOR_CYAN}/home/${ADMIN_USER}/apps${COLOR_RESET}"
     echo -e "   ${COLOR_BOLD_WHITE}URL VPN base:${COLOR_RESET}     ${COLOR_CYAN}*.vpn.${DOMAIN}${COLOR_RESET}"
-    echo -e "   ${COLOR_BOLD_WHITE}Portainer user:${COLOR_RESET}   ${COLOR_CYAN}${PORTAINER_ADMIN}${COLOR_RESET}"
-    echo -e "   ${COLOR_BOLD_WHITE}Portainer pass:${COLOR_RESET}   ●●●●●●●●"
-    echo -e "   ${COLOR_BOLD_WHITE}Kopia cifrado:${COLOR_RESET}    ●●●●●●●●"
+    echo ""
+    log_info "Las credenciales del admin se usarán también para Portainer y Kopia."
     echo ""
     print_separator
 
