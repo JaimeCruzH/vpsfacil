@@ -200,22 +200,11 @@ install_openclaw() {
     log_info "OpenClaw conecta múltiples plataformas de mensajería"
     log_info "(WhatsApp, Telegram, Slack, Discord...) con modelos de IA."
     echo ""
+    log_info "Proveedor de IA: configurable en el onboarding (OpenRouter, etc.)"
     log_info "Repositorio: https://github.com/openclaw/openclaw"
     echo ""
 
-    # ── Advertencia de seguridad ──────────────────────────────
-    echo -e "${COLOR_BOLD_RED}╔══ ADVERTENCIA DE SEGURIDAD CRÍTICA ════════════════════════╗${COLOR_RESET}"
-    echo -e "${COLOR_BOLD_RED}║                                                            ║${COLOR_RESET}"
-    echo -e "${COLOR_BOLD_RED}║  OpenClaw requiere tus credenciales personales de Claude.  ║${COLOR_RESET}"
-    echo -e "${COLOR_BOLD_RED}║  Estas dan acceso completo a tu cuenta de Claude.          ║${COLOR_RESET}"
-    echo -e "${COLOR_BOLD_RED}║                                                            ║${COLOR_RESET}"
-    echo -e "${COLOR_BOLD_RED}║  Por eso OpenClaw NUNCA se expone a internet.              ║${COLOR_RESET}"
-    echo -e "${COLOR_BOLD_RED}║  Solo accesible vía Tailscale VPN (red privada).           ║${COLOR_RESET}"
-    echo -e "${COLOR_BOLD_RED}║                                                            ║${COLOR_RESET}"
-    echo -e "${COLOR_BOLD_RED}╚════════════════════════════════════════════════════════════╝${COLOR_RESET}"
-    echo ""
-
-    if ! confirm "¿Entiendes los riesgos y deseas continuar?"; then
+    if ! confirm "¿Deseas instalar OpenClaw?"; then
         log_info "Instalación cancelada."
         return 0
     fi
@@ -227,7 +216,7 @@ install_openclaw() {
         log_warning "OpenClaw ya está instalado."
         echo ""
         log_info "Opciones:"
-        log_info "  1) Reinstalar (actualiza la imagen y reconfigura)"
+        log_info "  1) Reinstalar (actualiza la imagen)"
         log_info "  2) Cancelar"
         echo ""
         local opt
@@ -250,88 +239,33 @@ install_openclaw() {
     chown -R "${ADMIN_USER}:${ADMIN_USER}" "$APP_DIR"
     log_success "Directorio: ${APP_DIR} ✓"
 
-    # ── 2. Credenciales de Claude ─────────────────────────────
-    log_step "Configurar credenciales de Claude"
-
-    echo ""
-    log_info "Necesitas obtener tus credenciales de sesión de Claude."
-    echo ""
-
-    windows_instruction "CÓMO OBTENER LAS CREDENCIALES DE CLAUDE
-
-1. Abre Chrome o Edge en Windows
-
-2. Ve a: https://claude.ai  y asegúrate de estar logueado
-
-3. Presiona F12 para abrir las DevTools del navegador
-
-4. Ve a la pestaña: Application (o 'Aplicación' en español)
-
-5. En el panel izquierdo: Storage → Cookies → https://claude.ai
-
-6. Busca y copia estos dos valores:
-   - sessionKey           → empieza con 'sk-ant-sid...'
-   - __Secure-next-auth.session-token
-
-7. En la pestaña Network, carga cualquier página de claude.ai,
-   haz clic en una petición y copia el encabezado 'Cookie' completo"
-
-    echo ""
-    wait_for_user "Presiona Enter cuando tengas las credenciales listas..."
-    echo ""
-
-    log_warning "Las credenciales NO se mostrarán mientras las escribes."
-    echo ""
-
-    local CLAUDE_AI_SESSION_KEY CLAUDE_WEB_SESSION_KEY CLAUDE_WEB_COOKIE
-
-    CLAUDE_AI_SESSION_KEY=$(prompt_password "sessionKey de Claude (sk-ant-sid...)")
-    echo ""
-    CLAUDE_WEB_SESSION_KEY=$(prompt_password "__Secure-next-auth.session-token")
-    echo ""
-
-    log_info "Pega el contenido del header Cookie completo de claude.ai"
-    log_info "Termina con ENTER y luego CTRL+D:"
-    echo ""
-    CLAUDE_WEB_COOKIE=""
-    while IFS= read -r linea 2>/dev/null || true; do
-        linea="${linea//$'\r'/}"
-        CLAUDE_WEB_COOKIE+="${linea}"
-    done
-
-    if [[ -z "$CLAUDE_AI_SESSION_KEY" ]]; then
-        log_error "La sessionKey de Claude no puede estar vacía."
-        return 1
-    fi
-
-    # ── 3. Token de gateway ───────────────────────────────────
+    # ── 2. Token de gateway ───────────────────────────────────
     log_step "Generando token de Gateway"
     local GATEWAY_TOKEN
-    GATEWAY_TOKEN=$(generate_token 32)
-    log_success "Token de Gateway generado ✓"
+    # Reutilizar token existente si ya hay una instalación previa
+    if [[ -f "${APP_DIR}/.env" ]]; then
+        GATEWAY_TOKEN=$(grep "OPENCLAW_GATEWAY_TOKEN=" "${APP_DIR}/.env" 2>/dev/null | cut -d= -f2 || echo "")
+    fi
+    if [[ -z "${GATEWAY_TOKEN:-}" ]]; then
+        GATEWAY_TOKEN=$(generate_token 32)
+    fi
+    log_success "Token de Gateway listo ✓"
 
-    # ── 4. Archivo .env ───────────────────────────────────────
+    # ── 3. Archivo .env ───────────────────────────────────────
     log_step "Guardando configuración"
 
     cat > "${APP_DIR}/.env" << EOF
 # OpenClaw — VPSfacil
-# CONFIDENCIAL — NO compartir ni subir a GitHub
-
 OPENCLAW_GATEWAY_TOKEN=${GATEWAY_TOKEN}
 OPENCLAW_ALLOW_INSECURE_PRIVATE_WS=true
-
-CLAUDE_AI_SESSION_KEY=${CLAUDE_AI_SESSION_KEY}
-CLAUDE_WEB_SESSION_KEY=${CLAUDE_WEB_SESSION_KEY}
-CLAUDE_WEB_COOKIE=${CLAUDE_WEB_COOKIE}
-
 TZ=${TIMEZONE:-America/Santiago}
 EOF
 
     chmod 600 "${APP_DIR}/.env"
     chown "${ADMIN_USER}:${ADMIN_USER}" "${APP_DIR}/.env"
-    log_success "Archivo .env creado con permisos 600 ✓"
+    log_success "Archivo .env creado ✓"
 
-    # ── 5. Dockerfile ─────────────────────────────────────────
+    # ── 4. Dockerfile ─────────────────────────────────────────
     log_step "Preparando imagen Docker de OpenClaw"
 
     cat > "${APP_DIR}/Dockerfile" << 'DOCKERFILE'
@@ -351,7 +285,7 @@ DOCKERFILE
 
     chown "${ADMIN_USER}:${ADMIN_USER}" "${APP_DIR}/Dockerfile"
 
-    # ── 6. Construir imagen ───────────────────────────────────
+    # ── 5. Construir imagen ───────────────────────────────────
     log_step "Construyendo imagen Docker de OpenClaw"
     log_process "Puede tardar 3-5 minutos la primera vez..."
 
@@ -359,20 +293,15 @@ DOCKERFILE
     docker build -t openclaw-vpsfacil:latest . 2>&1 | tail -10
     log_success "Imagen openclaw-vpsfacil:latest construida ✓"
 
-    # ── 7. Docker Compose ─────────────────────────────────────
+    # ── 6. Docker Compose ─────────────────────────────────────
     log_step "Generando docker-compose.yml"
-
-    local CLAUDE_AI_ESC CLAUDE_WEB_ESC CLAUDE_COOKIE_ESC
-    CLAUDE_AI_ESC=$(compose_escape "$CLAUDE_AI_SESSION_KEY")
-    CLAUDE_WEB_ESC=$(compose_escape "$CLAUDE_WEB_SESSION_KEY")
-    CLAUDE_COOKIE_ESC=$(compose_escape "$CLAUDE_WEB_COOKIE")
 
     local COMPOSE_CONTENT
     COMPOSE_CONTENT=$(cat << EOF
 # ============================================================
 # OpenClaw — VPSfacil
 # Acceso: http://openclaw.vpn.${DOMAIN}:${PORT_OPENCLAW_WS}
-# SOLO vía Tailscale VPN — NUNCA exponer a internet
+# SOLO vía Tailscale VPN
 # ============================================================
 services:
   openclaw:
@@ -385,9 +314,6 @@ services:
       TZ: ${TIMEZONE:-America/Santiago}
       OPENCLAW_GATEWAY_TOKEN: "${GATEWAY_TOKEN}"
       OPENCLAW_ALLOW_INSECURE_PRIVATE_WS: "true"
-      CLAUDE_AI_SESSION_KEY: "${CLAUDE_AI_ESC}"
-      CLAUDE_WEB_SESSION_KEY: "${CLAUDE_WEB_ESC}"
-      CLAUDE_WEB_COOKIE: "${CLAUDE_COOKIE_ESC}"
     ports:
       - "${PORT_OPENCLAW_WS}:18789"
       - "${PORT_OPENCLAW_HTTP}:18790"
