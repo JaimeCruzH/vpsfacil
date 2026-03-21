@@ -271,9 +271,7 @@ EOF
     cat > "${APP_DIR}/Dockerfile" << 'DOCKERFILE'
 FROM node:24-bookworm
 
-RUN npm install -g pnpm
-
-RUN pnpm add -g openclaw@latest
+RUN corepack enable pnpm && pnpm add -g openclaw@latest
 
 USER node
 WORKDIR /home/node
