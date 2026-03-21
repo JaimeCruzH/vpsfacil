@@ -145,6 +145,23 @@ if [[ -z "${PORTAINER_ADMIN:-}" ]]; then
     print_separator
     echo ""
     collect_phase_b_credentials
+
+    # Guardar credenciales al archivo de configuración (persistencia entre ejecuciones)
+    cat >> "$CONFIG_FILE" << EOF
+PORTAINER_ADMIN="$PORTAINER_ADMIN"
+PORTAINER_PASS="$PORTAINER_PASS"
+KOPIA_PASS="$KOPIA_PASS"
+EOF
+    chmod 644 "$CONFIG_FILE"
+
+    # Copiar también a HOME para persistir si /tmp desaparece (ej: reinicio)
+    cp "$CONFIG_FILE" "${HOME}/setup.conf"
+    chmod 644 "${HOME}/setup.conf"
+fi
+
+# Si el CONFIG_FILE estaba en /tmp y ya no existe, restaurar desde HOME
+if [[ ! -f "$CONFIG_FILE" && -f "${HOME}/setup.conf" ]]; then
+    CONFIG_FILE="${HOME}/setup.conf"
 fi
 
 # Derivar variables adicionales
@@ -187,12 +204,6 @@ echo ""
 print_separator
 echo ""
 
-# Mostrar progreso actual (si hay instalación previa)
-# Desactivar set -e temporalmente para progress_show
-set +e
-progress_show
-set -e
-
 # Esperar confirmación del usuario
 echo ""
 echo -e "${PREFIX_PROMPT} Presiona Enter para continuar (continuando en 3 segundos)..."
@@ -214,9 +225,6 @@ run_step() {
     local script_name="$2"
     local description="$3"
 
-    # Mostrar progreso actual
-    progress_show
-
     echo ""
     log_step "Paso $step_num: $description"
     echo ""
@@ -224,33 +232,32 @@ run_step() {
     # Registrar inicio del paso
     progress_start_step "$step_num"
 
-    # Ejecutar el script
+    # Ejecutar el script con sudo (los scripts individuales requieren root)
     if [[ "$REMOTE_INSTALL" == "true" ]]; then
-        # Descargar script temporalmente desde GitHub
         local REPO_RAW="https://raw.githubusercontent.com/JaimeCruzH/vpsfacil/main"
-        bash <(curl -sSL "${REPO_RAW}/${script_name}") 2>&1
+        sudo bash <(curl -sSL "${REPO_RAW}/${script_name}") 2>&1
     else
-        # Ejecutar script local
-        bash "${REPO_DIR}/${script_name}" 2>&1
+        sudo bash "${REPO_DIR}/${script_name}" 2>&1
     fi
 
     local exit_code=$?
 
     if [[ $exit_code -eq 0 ]]; then
-        log_success "Paso $step_num completado ✓"
         progress_complete_step "$step_num"
+        echo ""
+        # Mostrar tabla actualizada solo después de completar el paso
+        progress_show
+        echo ""
     else
-        log_error "Paso $step_num falló con código $exit_code"
         progress_fail_step "$step_num" "Exit code $exit_code"
         echo ""
-        log_error "INSTALACIÓN DETENIDA"
+        progress_show
+        echo ""
+        log_error "INSTALACIÓN DETENIDA en Paso $step_num"
         log_info "El progreso ha sido guardado. Cuando resuelvas el error,"
         log_info "reconéctate y ejecuta nuevamente: bash ~/install_core.sh"
         exit 1
     fi
-
-    # Mostrar progreso actualizado
-    echo ""
 }
 
 # ============================================================
@@ -270,10 +277,6 @@ run_step 11 "scripts/10_install_filebrowser.sh" "Instalar File Browser"
 # RESUMEN FINAL
 # ============================================================
 echo ""
-echo ""
-
-# Mostrar progreso final
-progress_show
 
 # Calcular duración total
 total_seconds=$(progress_get_total_duration)
