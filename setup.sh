@@ -872,13 +872,19 @@ echo ""
 # ============================================================
 RESUME_MODE=false
 
-if [[ -f "/tmp/vpsfacil_setup.conf" && -f "$PROGRESS_LOG" ]]; then
+# Buscar config en /tmp o en home del usuario (si ya se instaló antes)
+CONFIG_FOUND=""
+if [[ -f "/tmp/vpsfacil_setup.conf" ]]; then
+    CONFIG_FOUND="/tmp/vpsfacil_setup.conf"
+fi
+
+if [[ -f "$PROGRESS_LOG" && -n "$CONFIG_FOUND" ]]; then
     echo ""
     log_warning "Se detectó una instalación previa en progreso."
     echo ""
 
     # Cargar configuración previa
-    source "/tmp/vpsfacil_setup.conf"
+    source "$CONFIG_FOUND"
     _derive_config_vars
 
     # Mostrar progreso actual
