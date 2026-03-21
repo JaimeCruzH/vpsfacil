@@ -280,7 +280,23 @@ fi
 
 # Guardar credenciales para uso automático por todas las apps
 portainer_save_creds "$PORTAINER_ADMIN" "$PORTAINER_ADMIN_PASS"
-log_success "Credenciales guardadas → las apps se desplegarán automáticamente en Portainer ✓"
+log_success "Credenciales guardadas ✓"
+
+# Asegurar que el entorno Docker local está inicializado en Portainer
+# (en versiones recientes de CE, puede no crearse automáticamente)
+log_process "Verificando entorno Docker local en Portainer..."
+local_jwt=$(portainer_login "$PORTAINER_ADMIN" "$PORTAINER_ADMIN_PASS" 2>/dev/null) || local_jwt=""
+if [[ -n "$local_jwt" ]]; then
+    portainer_ensure_endpoint "$local_jwt"
+    local_eid=$(portainer_endpoint_id "$local_jwt" 2>/dev/null) || local_eid=""
+    if [[ -n "$local_eid" ]]; then
+        log_success "Entorno Docker local verificado (ID: ${local_eid}) ✓"
+    else
+        log_warning "No se pudo verificar el entorno Docker local"
+    fi
+else
+    log_warning "No se pudo autenticar para verificar entorno Docker"
+fi
 
 # ============================================================
 # RESUMEN

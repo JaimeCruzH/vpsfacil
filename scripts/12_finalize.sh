@@ -104,48 +104,49 @@ log_step "Registrando stacks en Portainer como editables"
 if portainer_load_creds 2>/dev/null; then
     JWT=$(portainer_login "$PORTAINER_USER" "$PORTAINER_PASS" 2>/dev/null) || JWT=""
     if [[ -n "$JWT" ]]; then
-        ENDPOINT_ID=$(portainer_endpoint_id "$JWT")
+        # Asegurar que el entorno Docker local existe
+        portainer_ensure_endpoint "$JWT"
+        ENDPOINT_ID=$(portainer_endpoint_id "$JWT" 2>/dev/null) || ENDPOINT_ID=""
 
-        for stack_name in kopia filebrowser; do
-            APP_COMPOSE="${APPS_DIR}/${stack_name}/docker-compose.yml"
-            if [[ ! -f "$APP_COMPOSE" ]]; then
-                continue
-            fi
+        if [[ -z "$ENDPOINT_ID" ]]; then
+            log_warning "No hay entorno Docker local en Portainer. Stacks no migrados."
+        else
+            for stack_name in kopia filebrowser beszel; do
+                APP_COMPOSE="${APPS_DIR}/${stack_name}/docker-compose.yml"
+                if [[ ! -f "$APP_COMPOSE" ]]; then
+                    continue
+                fi
 
-            # Verificar si ya existe como stack gestionado en Portainer
-            EXISTING_STACKS=$(curl -sk -X GET "${PORTAINER_URL}/api/stacks" \
-                -H "Authorization: Bearer ${JWT}" 2>/dev/null)
-            STACK_ID=$(echo "$EXISTING_STACKS" | \
-                jq -r --arg name "$stack_name" \
-                '.[] | select(.Name==$name) | .Id' 2>/dev/null || echo "")
-
-            if [[ -n "$STACK_ID" ]]; then
-                # Ya existe en Portainer — verificar si es Limited (Type=2 es compose standalone)
-                STACK_TYPE=$(echo "$EXISTING_STACKS" | \
+                # Verificar si ya existe como stack gestionado en Portainer
+                EXISTING_STACKS=$(curl -sk -X GET "${PORTAINER_URL}/api/stacks" \
+                    -H "Authorization: Bearer ${JWT}" 2>/dev/null)
+                STACK_ID=$(echo "$EXISTING_STACKS" | \
                     jq -r --arg name "$stack_name" \
-                    '.[] | select(.Name==$name) | .Type' 2>/dev/null || echo "")
-                # Si es tipo 2 (standalone) y el Status es activo, ya está gestionado
-                log_info "${stack_name}: ya registrado en Portainer (ID: ${STACK_ID})"
-                continue
-            fi
+                    '.[] | select(.Name==$name) | .Id' 2>/dev/null || echo "")
 
-            # No existe como stack gestionado — detener contenedor y crear via API
-            log_process "Migrando ${stack_name} a stack editable..."
+                if [[ -n "$STACK_ID" ]]; then
+                    log_info "${stack_name}: ya registrado en Portainer (ID: ${STACK_ID})"
+                    continue
+                fi
 
-            # Detener el contenedor creado por docker compose
-            cd "${APPS_DIR}/${stack_name}" 2>/dev/null || continue
-            docker compose down 2>/dev/null || true
+                # No existe como stack gestionado — detener contenedor y crear via API
+                log_process "Migrando ${stack_name} a stack editable..."
 
-            # Crear via API de Portainer (esto lo hace editable)
-            COMPOSE_CONTENT=$(cat "$APP_COMPOSE")
-            if portainer_stack_deploy "$JWT" "$ENDPOINT_ID" "$stack_name" "$COMPOSE_CONTENT"; then
-                log_success "${stack_name}: migrado a stack editable ✓"
-            else
-                # Fallback: volver a levantar con docker compose
-                log_warning "${stack_name}: no se pudo migrar, restaurando..."
-                docker compose up -d 2>/dev/null || true
-            fi
-        done
+                # Detener el contenedor creado por docker compose
+                cd "${APPS_DIR}/${stack_name}" 2>/dev/null || continue
+                docker compose down 2>/dev/null || true
+
+                # Crear via API de Portainer (esto lo hace editable)
+                COMPOSE_CONTENT=$(cat "$APP_COMPOSE")
+                if portainer_stack_deploy "$JWT" "$ENDPOINT_ID" "$stack_name" "$COMPOSE_CONTENT"; then
+                    log_success "${stack_name}: migrado a stack editable ✓"
+                else
+                    # Fallback: volver a levantar con docker compose
+                    log_warning "${stack_name}: no se pudo migrar, restaurando..."
+                    docker compose up -d 2>/dev/null || true
+                fi
+            done
+        fi
     else
         log_warning "No se pudo conectar con Portainer API. Stacks no migrados."
     fi
