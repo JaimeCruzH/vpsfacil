@@ -76,6 +76,7 @@ if [[ "$USUARIO_NUEVO" == "true" ]]; then
         echo ""
         log_info "Define una contraseña para el usuario '${ADMIN_USER}'."
         log_info "Esta contraseña la necesitarás ocasionalmente para sudo."
+        log_info "Requisitos: mínimo 8 caracteres, solo letras (a-z, A-Z) y números (0-9)."
         log_warning "Guarda esta contraseña en un lugar seguro (ej: gestor de contraseñas)"
         echo ""
 
@@ -83,14 +84,14 @@ if [[ "$USUARIO_NUEVO" == "true" ]]; then
             PASS1=$(prompt_password "Ingresa la contraseña para '${ADMIN_USER}'")
             PASS2=$(prompt_password "Confirma la contraseña")
 
-            if [[ "$PASS1" == "$PASS2" ]]; then
-                if [[ ${#PASS1} -lt 8 ]]; then
-                    log_warning "La contraseña debe tener al menos 8 caracteres. Intenta de nuevo."
-                else
-                    break
-                fi
-            else
+            if [[ "$PASS1" != "$PASS2" ]]; then
                 log_warning "Las contraseñas no coinciden. Intenta de nuevo."
+            elif [[ ${#PASS1} -lt 8 ]]; then
+                log_warning "Mínimo 8 caracteres."
+            elif [[ ! "$PASS1" =~ ^[a-zA-Z0-9]+$ ]]; then
+                log_warning "Solo se permiten letras (a-z, A-Z) y números (0-9). Sin espacios ni símbolos."
+            else
+                break
             fi
         done
         ADMIN_PASS="$PASS1"
