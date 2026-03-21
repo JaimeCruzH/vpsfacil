@@ -43,7 +43,7 @@ fi
 
 
 # ============================================================
-print_header "Paso 7 de 10 — Certificados SSL (Let's Encrypt)"
+print_header "Paso 6 de 11 — Certificados SSL (Let's Encrypt)"
 # ============================================================
 
 check_root

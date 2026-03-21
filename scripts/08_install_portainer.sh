@@ -39,7 +39,7 @@ fi
 
 
 # ============================================================
-print_header "Paso 9 de 10 — Instalar Portainer"
+print_header "Paso 8 de 11 — Instalar Portainer"
 # ============================================================
 
 check_root

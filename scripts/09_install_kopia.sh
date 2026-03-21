@@ -41,7 +41,7 @@ fi
 
 
 # ============================================================
-print_header "Paso 10 de 10 — Instalar Kopia Backup"
+print_header "Paso 9 de 11 — Instalar Kopia Backup"
 # ============================================================
 
 check_root

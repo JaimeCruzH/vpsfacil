@@ -206,25 +206,25 @@ log_step "Guardando configuración de VPSfacil"
 
 CONFIG_DEST="${ADMIN_HOME}/setup.conf"
 
-cat > "$CONFIG_DEST" << EOF
-# ============================================================
-# VPSfacil - Configuración de instalación
-# Generado: $(date '+%Y-%m-%d %H:%M:%S')
-# ============================================================
-
-DOMAIN="${DOMAIN}"
-ADMIN_USER="${ADMIN_USER}"
-TIMEZONE="${TIMEZONE}"
-INSTALLATION_DATE="$(date '+%Y-%m-%d')"
-EOF
+# Escribir con printf %q para escapar caracteres especiales en contraseñas
+{
+    echo "# VPSfacil - Configuración de instalación"
+    echo "# Generado: $(date '+%Y-%m-%d %H:%M:%S')"
+    echo ""
+    printf 'DOMAIN=%q\n' "$DOMAIN"
+    printf 'ADMIN_USER=%q\n' "$ADMIN_USER"
+    printf 'TIMEZONE=%q\n' "$TIMEZONE"
+    printf 'INSTALLATION_DATE=%q\n' "$(date '+%Y-%m-%d')"
+    printf 'ADMIN_PASS=%q\n' "${ADMIN_PASS:-}"
+} > "$CONFIG_DEST"
 
 # Agregar credenciales si existen
 if [[ -n "${PORTAINER_ADMIN:-}" ]]; then
-    cat >> "$CONFIG_DEST" << EOF
-PORTAINER_ADMIN="${PORTAINER_ADMIN}"
-PORTAINER_PASS="${PORTAINER_PASS}"
-KOPIA_PASS="${KOPIA_PASS}"
-EOF
+    {
+        printf 'PORTAINER_ADMIN=%q\n' "$PORTAINER_ADMIN"
+        printf 'PORTAINER_PASS=%q\n' "$PORTAINER_PASS"
+        printf 'KOPIA_PASS=%q\n' "$KOPIA_PASS"
+    } >> "$CONFIG_DEST"
 fi
 
 chmod 600 "$CONFIG_DEST"

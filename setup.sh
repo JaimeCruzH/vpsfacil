@@ -432,21 +432,20 @@ _derive_config_vars() {
 save_config() {
     local config_file="/tmp/vpsfacil_setup.conf"
 
-    cat > "$config_file" << EOF
-# ============================================================
-# VPSfacil - Configuración de instalación
-# Generado automáticamente el $(date '+%Y-%m-%d %H:%M:%S')
-# NO editar manualmente a menos que sepas lo que haces
-# ============================================================
-
-DOMAIN="${DOMAIN}"
-ADMIN_USER="${ADMIN_USER}"
-TIMEZONE="${TIMEZONE:-America/Santiago}"
-INSTALLATION_DATE="$(date '+%Y-%m-%d')"
-PORTAINER_ADMIN="${PORTAINER_ADMIN:-}"
-PORTAINER_PASS="${PORTAINER_PASS:-}"
-KOPIA_PASS="${KOPIA_PASS:-}"
-EOF
+    # Escribir línea por línea con printf %q para escapar caracteres especiales
+    {
+        echo "# VPSfacil - Configuración de instalación"
+        echo "# Generado: $(date '+%Y-%m-%d %H:%M:%S')"
+        echo ""
+        printf 'DOMAIN=%q\n' "$DOMAIN"
+        printf 'ADMIN_USER=%q\n' "$ADMIN_USER"
+        printf 'TIMEZONE=%q\n' "${TIMEZONE:-America/Santiago}"
+        printf 'INSTALLATION_DATE=%q\n' "$(date '+%Y-%m-%d')"
+        printf 'ADMIN_PASS=%q\n' "$ADMIN_PASS"
+        printf 'PORTAINER_ADMIN=%q\n' "$PORTAINER_ADMIN"
+        printf 'PORTAINER_PASS=%q\n' "$PORTAINER_PASS"
+        printf 'KOPIA_PASS=%q\n' "$KOPIA_PASS"
+    } > "$config_file"
 
     chmod 600 "$config_file"
     log_success "Configuración guardada en: ${config_file}"
@@ -806,10 +805,6 @@ run_step() {
         log_info "Paso $step_num ya completado, saltando..."
         return 0
     fi
-
-    echo ""
-    log_step "Paso $step_num de 11: $description"
-    echo ""
 
     progress_start_step "$step_num"
 

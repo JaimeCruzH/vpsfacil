@@ -44,7 +44,7 @@ source "${LIB_DIR}/utils.sh"
 source_config
 
 # ============================================================
-print_header "Paso 4 de 10 — Instalar Firewall UFW"
+print_header "Paso 3 de 11 — Instalar Firewall UFW"
 # ============================================================
 
 check_root

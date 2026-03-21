@@ -32,7 +32,7 @@ fi
 
 
 # ============================================================
-print_header "Paso 11 de 11 — Instalar File Browser"
+print_header "Paso 10 de 11 — Instalar File Browser"
 # ============================================================
 
 check_root

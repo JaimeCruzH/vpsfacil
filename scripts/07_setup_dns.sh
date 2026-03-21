@@ -45,7 +45,7 @@ fi
 
 
 # ============================================================
-print_header "Paso 8 de 10 — Configurar DNS en Cloudflare"
+print_header "Paso 7 de 11 — Configurar DNS en Cloudflare"
 # ============================================================
 
 check_root

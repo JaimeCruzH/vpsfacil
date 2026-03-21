@@ -44,7 +44,7 @@ source "${LIB_DIR}/utils.sh"
 source_config
 
 # ============================================================
-print_header "Paso 6 de 10 — Instalar Tailscale VPN"
+print_header "Paso 5 de 11 — Instalar Tailscale VPN"
 # ============================================================
 
 check_root
