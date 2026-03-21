@@ -542,7 +542,7 @@ progress_get_total_duration() {
             if [[ "$dur_field" =~ DURACION=([0-9]+)m([0-9]+)s ]]; then
                 local mins="${BASH_REMATCH[1]}"
                 local secs="${BASH_REMATCH[2]}"
-                total_seconds=$((total_seconds + mins * 60 + secs))
+                total_seconds=$((total_seconds + 10#$mins * 60 + 10#$secs))
             fi
         fi
     done < "$PROGRESS_LOG"
