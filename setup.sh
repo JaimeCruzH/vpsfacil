@@ -620,13 +620,11 @@ readonly PORT_PORTAINER="9443"
 readonly PORT_FILEBROWSER="8080"
 readonly PORT_KOPIA="51515"
 readonly PORT_BESZEL="8090"
-readonly PORT_BESZEL_AGENT="45876"
 
 readonly IMG_PORTAINER="portainer/portainer-ce:latest"
 readonly IMG_FILEBROWSER="filebrowser/filebrowser:latest"
 readonly IMG_KOPIA="kopia/kopia:latest"
 readonly IMG_BESZEL="henrygd/beszel:latest"
-readonly IMG_BESZEL_AGENT="henrygd/beszel-agent:latest"
 
 readonly TIMEOUT_DOCKER_START=60
 readonly TIMEOUT_APP_START=120

@@ -1,13 +1,12 @@
 #!/bin/bash
 # ============================================================
-# scripts/11_install_beszel.sh — Instalar Beszel Monitoring
+# scripts/11_install_beszel.sh — Instalar Beszel Monitoring (Hub)
 # VPSfacil - Sistema Automatizado de Instalación en VPS
 #
 # Qué hace este script:
 #   1. Despliega Beszel Hub (dashboard de monitoreo, puerto 8090)
-#   2. Despliega Beszel Agent (recolector de métricas, puerto 45876)
-#   3. Genera par de llaves SSH para comunicación hub↔agent
-#   4. Configura el agent para reportar al hub local
+#
+# El agent se instala manualmente después desde el dashboard.
 #
 # Beszel monitorea: CPU, RAM, disco, red, temperatura, contenedores
 #
@@ -65,41 +64,22 @@ APP_DIR="${APPS_DIR}/beszel"
 log_step "Creando estructura de directorios"
 
 mkdir -p "${APP_DIR}/beszel_data"
-mkdir -p "${APP_DIR}/ssh_keys"
 chown -R "${ADMIN_USER}:${ADMIN_USER}" "$APP_DIR"
 
 log_success "Directorio: ${APP_DIR} ✓"
 
 # ============================================================
-# 2. GENERAR LLAVES SSH PARA HUB ↔ AGENT
+# 2. GENERAR DOCKER-COMPOSE (solo Hub)
 # ============================================================
-log_step "Generando llaves SSH para comunicación hub-agent"
-
-BESZEL_KEY="${APP_DIR}/ssh_keys/beszel_ed25519"
-
-if [[ -f "$BESZEL_KEY" ]]; then
-    log_info "Llaves SSH ya existen, reutilizando"
-else
-    ssh-keygen -t ed25519 -f "$BESZEL_KEY" -N "" -C "beszel@vpsfacil" > /dev/null 2>&1
-    log_success "Par de llaves Ed25519 generado ✓"
-fi
-
-BESZEL_PUB_KEY=$(cat "${BESZEL_KEY}.pub")
-chmod 600 "$BESZEL_KEY"
-chmod 644 "${BESZEL_KEY}.pub"
-chown -R "${ADMIN_USER}:${ADMIN_USER}" "${APP_DIR}/ssh_keys"
-
-# ============================================================
-# 3. GENERAR DOCKER-COMPOSE
-# ============================================================
-log_step "Generando configuración de Beszel"
+log_step "Generando configuración de Beszel Hub"
 
 COMPOSE_CONTENT=$(cat << EOF
 # ============================================================
-# Beszel Monitoring — VPSfacil
-# Hub:   http://beszel.vpn.${DOMAIN}:${PORT_BESZEL}
-# Agent: puerto ${PORT_BESZEL_AGENT} (host network)
+# Beszel Monitoring Hub — VPSfacil
+# Dashboard: http://beszel.vpn.${DOMAIN}:${PORT_BESZEL}
 # Solo vía Tailscale VPN
+#
+# El agent se configura después desde el dashboard de Beszel.
 # ============================================================
 services:
   beszel-hub:
@@ -115,17 +95,6 @@ services:
     networks:
       - vpsfacil-net
 
-  beszel-agent:
-    image: ${IMG_BESZEL_AGENT}
-    container_name: beszel-agent
-    restart: unless-stopped
-    network_mode: host
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    environment:
-      PORT: "${PORT_BESZEL_AGENT}"
-      KEY: "${BESZEL_PUB_KEY}"
-
 networks:
   vpsfacil-net:
     external: true
@@ -137,13 +106,13 @@ chown "${ADMIN_USER}:${ADMIN_USER}" "${APP_DIR}/docker-compose.yml"
 log_success "docker-compose.yml generado ✓"
 
 # ============================================================
-# 4. DESPLEGAR BESZEL
+# 3. DESPLEGAR BESZEL HUB
 # ============================================================
-log_step "Desplegando Beszel hub + agent"
+log_step "Desplegando Beszel Hub"
 
-# Detener contenedores anteriores si existen
-docker stop beszel beszel-agent 2>/dev/null || true
-docker rm beszel beszel-agent 2>/dev/null || true
+# Detener contenedor anterior si existe
+docker stop beszel 2>/dev/null || true
+docker rm beszel 2>/dev/null || true
 
 log_process "Registrando stack en Portainer..."
 if portainer_deploy_stack "beszel" "$COMPOSE_CONTENT" 2>/dev/null; then
@@ -155,30 +124,19 @@ else
     docker compose up -d
 fi
 
-log_process "Esperando que Beszel hub inicie..."
+log_process "Esperando que Beszel Hub inicie..."
 wait_for_port "localhost" "${PORT_BESZEL}" 60
 
-log_success "Beszel hub corriendo ✓"
-
-# Verificar que el agent también está corriendo
-sleep 3
-if docker ps --filter "name=beszel-agent" --format "{{.Status}}" | grep -q "Up"; then
-    log_success "Beszel agent corriendo ✓"
-else
-    log_warning "El agent puede tardar unos segundos en iniciar"
-fi
+log_success "Beszel Hub corriendo ✓"
 
 # ============================================================
-# 5. GUARDAR LLAVE PRIVADA PARA CONFIGURACIÓN DEL HUB
+# 4. GUARDAR CONFIGURACIÓN
 # ============================================================
 log_step "Guardando configuración"
 
-# Guardar info para que el usuario configure el hub
 cat > "${APP_DIR}/.env" << EOF
 # Beszel Monitoring — VPSfacil
 BESZEL_HUB_PORT=${PORT_BESZEL}
-BESZEL_AGENT_PORT=${PORT_BESZEL_AGENT}
-BESZEL_SSH_KEY=${BESZEL_KEY}
 EOF
 
 chmod 600 "${APP_DIR}/.env"
@@ -192,7 +150,7 @@ log_success "Configuración guardada ✓"
 echo ""
 print_separator
 echo ""
-log_success "Beszel Monitoring instalado exitosamente"
+log_success "Beszel Hub instalado exitosamente"
 echo ""
 log_info "Las instrucciones de acceso se mostrarán al final de la instalación."
 echo ""
