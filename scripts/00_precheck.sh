@@ -42,7 +42,7 @@ source "${LIB_DIR}/utils.sh"
 source_config
 
 # ============================================================
-print_header "Paso 1 de 11 — Pre-verificaciones del Sistema"
+print_header "Paso 1 de 12 — Pre-verificaciones del Sistema"
 # ============================================================
 
 log_info "Verificando que el sistema cumpla todos los requisitos"

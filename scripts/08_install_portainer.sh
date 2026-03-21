@@ -44,7 +44,7 @@ source_config
 source "${LIB_DIR}/portainer_api.sh" 2>/dev/null || true
 
 # ============================================================
-print_header "Paso 8 de 11 — Instalar Portainer"
+print_header "Paso 8 de 12 — Instalar Portainer"
 # ============================================================
 
 check_root

@@ -3,7 +3,7 @@
 # scripts/10_install_filebrowser.sh — Instalar File Browser
 # VPSfacil - Sistema Automatizado de Instalación en VPS
 #
-# Paso 11 de 11 — Instalar File Browser (gestor de archivos web)
+# Paso 11 de 12 — Instalar File Browser (gestor de archivos web)
 # Acceso: http://files.vpn.DOMAIN:8080 (solo Tailscale VPN)
 # Autenticación: DESHABILITADA (VPN es la seguridad)
 # Requisitos: ejecutar como root
@@ -37,7 +37,7 @@ source_config
 source "${LIB_DIR}/portainer_api.sh" 2>/dev/null || true
 
 # ============================================================
-print_header "Paso 10 de 11 — Instalar File Browser"
+print_header "Paso 10 de 12 — Instalar File Browser"
 # ============================================================
 
 check_root

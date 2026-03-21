@@ -144,6 +144,12 @@ Todas las aplicaciones se instalan bajo `/home/${ADMIN_USER}/apps/`:
 │   ├── docker-compose.yml
 │   └── data/
 │
+├── beszel/                     # Beszel Monitoring (core, solo VPN)
+│   ├── docker-compose.yml
+│   ├── .env
+│   ├── beszel_data/
+│   └── ssh_keys/               # Llaves Ed25519 hub↔agent
+│
 ├── n8n/                        # N8N (opcional, solo VPN)
 │   ├── docker-compose.yml
 │   ├── .env
@@ -173,12 +179,13 @@ El usuario admin se crea al inicio, el hardening SSH se aplica al final.
 | 3 | `03_install_firewall.sh` | UFW + fix crítico Docker/UFW (iptables=false) |
 | 4 | `04_install_docker.sh` | Docker CE + Docker Compose v2, agregar usuario a grupo docker |
 | 5 | `05_install_tailscale.sh` | Instalar Tailscale, autenticar, obtener IP VPN (100.x.x.x) |
-| 6 | `06_setup_certificates.sh` | Certificados Let's Encrypt wildcard vía DNS-01 |
-| 7 | `07_setup_dns.sh` | Crear registros DNS en Cloudflare (*.vpn.DOMAIN → Tailscale IP) |
+| 6 | `07_setup_dns.sh` | Crear registros DNS en Cloudflare (*.vpn.DOMAIN → Tailscale IP) |
+| 7 | `06_setup_certificates.sh` | Certificados Let's Encrypt wildcard vía DNS-01 |
 | 8 | `08_install_portainer.sh` | Portainer CE vía Docker (acceso solo vía VPN) |
 | 9 | `09_install_kopia.sh` | Kopia Backup vía Docker, schedule automático |
 | 10 | `10_install_filebrowser.sh` | File Browser web (acceso VPN) |
-| 11 | `11_finalize.sh` | Barrido de permisos, verificar SSH del admin, hardening SSH, fail2ban |
+| 11 | `11_install_beszel.sh` | Beszel Monitoring (hub + agent, CPU/RAM/disco/red) |
+| 12 | `12_finalize.sh` | Barrido de permisos, verificar SSH del admin, hardening SSH, fail2ban |
 
 **Nota:** Las aplicaciones opcionales (N8N, OpenClaw) se instalarán con un script separado en el futuro.
 
@@ -216,6 +223,8 @@ Con esto:
 | 18789 | TCP | OpenClaw WebSocket | Solo Tailscale IP |
 | 18790 | TCP | OpenClaw HTTP | Solo Tailscale IP |
 | 8080 | TCP | File Browser | Solo Tailscale IP |
+| 8090 | TCP | Beszel Hub | Solo Tailscale IP |
+| 45876 | TCP | Beszel Agent | Host network (local) |
 | 51515 | TCP | Kopia WebUI | Solo Tailscale IP |
 
 ---
@@ -254,18 +263,19 @@ VPSfacil/
 ├── setup.sh                         # Script principal autocontenido (descargado por curl)
 ├── .gitignore                       # Protege secretos de subir a GitHub
 │
-├── scripts/                         # Módulos de instalación core (11 pasos)
+├── scripts/                         # Módulos de instalación core (12 pasos)
 │   ├── 00_precheck.sh               # Paso 1: Verificaciones previas + dependencias
 │   ├── 01_create_user.sh            # Paso 2: Crear usuario admin (sin hardening SSH)
 │   ├── 03_install_firewall.sh       # Paso 3: UFW + fix Docker/UFW
 │   ├── 04_install_docker.sh         # Paso 4: Docker CE + Compose v2
 │   ├── 05_install_tailscale.sh      # Paso 5: Tailscale VPN
-│   ├── 06_setup_certificates.sh     # Paso 6: Certificados Let's Encrypt
-│   ├── 07_setup_dns.sh              # Paso 7: DNS Cloudflare vía API
+│   ├── 07_setup_dns.sh              # Paso 6: DNS Cloudflare vía API
+│   ├── 06_setup_certificates.sh     # Paso 7: Certificados Let's Encrypt
 │   ├── 08_install_portainer.sh      # Paso 8: Portainer CE
 │   ├── 09_install_kopia.sh          # Paso 9: Kopia Backup
 │   ├── 10_install_filebrowser.sh    # Paso 10: File Browser web
-│   └── 11_finalize.sh               # Paso 11: Permisos + hardening SSH + fail2ban
+│   ├── 11_install_beszel.sh         # Paso 11: Beszel Monitoring (hub + agent)
+│   └── 12_finalize.sh               # Paso 12: Permisos + hardening SSH + fail2ban
 │
 ├── apps/                            # Instaladores de apps opcionales (futuro, script separado)
 │   ├── n8n.sh                       # N8N + PostgreSQL
@@ -275,7 +285,7 @@ VPSfacil/
 │   ├── colors.sh                    # Definiciones de colores ANSI
 │   ├── utils.sh                     # Utilidades comunes bash
 │   ├── config.sh                    # Variables globales y configuración
-│   ├── progress.sh                  # Tracking de progreso visual (11 pasos)
+│   ├── progress.sh                  # Tracking de progreso visual (12 pasos)
 │   ├── portainer_api.sh             # Wrappers REST API de Portainer
 │   └── cloudflare_api.sh            # Wrappers API DNS de Cloudflare
 │
@@ -290,9 +300,9 @@ VPSfacil/
 **Arquitectura de fase única:** Todo se ejecuta como root en una sola sesión SSH.
 
 - El usuario admin se crea en el paso 2 (`01_create_user.sh`)
-- Todos los pasos 1-10 se ejecutan como root (sin cambio de usuario)
-- El paso 11 (`11_finalize.sh`) hace un barrido de permisos (`chown -R`) para asegurar que el admin sea dueño de todo en `/home/ADMIN_USER/`
-- El hardening SSH (deshabilitar root) se aplica en el paso 11 — **DESPUÉS** de verificar que el usuario admin puede conectarse
+- Todos los pasos 1-11 se ejecutan como root (sin cambio de usuario)
+- El paso 12 (`12_finalize.sh`) hace un barrido de permisos (`chown -R`) para asegurar que el admin sea dueño de todo en `/home/ADMIN_USER/`
+- El hardening SSH (deshabilitar root) se aplica en el paso 12 — **DESPUÉS** de verificar que el usuario admin puede conectarse
 - Después de la instalación, el usuario admin accede vía SSH con llave
 
 El usuario admin tiene acceso sudo sin password para gestionar Docker y el sistema después de la instalación.
@@ -472,8 +482,8 @@ TZ=America/Santiago             # Zona horaria
 - [x] Estructura de carpetas creada
 - [x] CLAUDE.md actualizado
 - [x] GitHub configurado
-- [x] Scripts core en desarrollo (pasos 1-11)
+- [x] Scripts core en desarrollo (pasos 1-12, incluye Beszel)
 - [ ] Pruebas en VPS fresco
 - [ ] Script de apps opcionales (futuro, separado)
 
-**Arquitectura v2:** Fase única como root, 11 pasos secuenciales, hardening SSH al final.
+**Arquitectura v2:** Fase única como root, 12 pasos secuenciales, hardening SSH al final.

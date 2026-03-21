@@ -43,7 +43,7 @@ source "${LIB_DIR}/utils.sh"
 source_config
 
 # ============================================================
-print_header "Paso 2 de 11 — Crear Usuario Administrador"
+print_header "Paso 2 de 12 — Crear Usuario Administrador"
 # ============================================================
 
 log_info "Este paso creará el usuario '${ADMIN_USER}' que será"

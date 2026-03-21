@@ -47,7 +47,7 @@ source "${LIB_DIR}/utils.sh"
 source_config
 
 # ============================================================
-print_header "Paso 6 de 11 — Configurar DNS en Cloudflare"
+print_header "Paso 6 de 12 — Configurar DNS en Cloudflare"
 # ============================================================
 
 check_root
@@ -59,6 +59,7 @@ log_info "Cada app tendrá su propio subdominio:"
 echo -e "   ${COLOR_CYAN}portainer.vpn.${DOMAIN}${COLOR_RESET} → IP Tailscale"
 echo -e "   ${COLOR_CYAN}files.vpn.${DOMAIN}${COLOR_RESET}     → IP Tailscale"
 echo -e "   ${COLOR_CYAN}kopia.vpn.${DOMAIN}${COLOR_RESET}     → IP Tailscale"
+echo -e "   ${COLOR_CYAN}beszel.vpn.${DOMAIN}${COLOR_RESET}    → IP Tailscale"
 echo ""
 
 # ============================================================
@@ -181,6 +182,7 @@ declare -A SUBDOMINIOS=(
     ["portainer"]="portainer.vpn.${DOMAIN}"
     ["files"]="files.vpn.${DOMAIN}"
     ["kopia"]="kopia.vpn.${DOMAIN}"
+    ["beszel"]="beszel.vpn.${DOMAIN}"
 )
 
 # Función para crear o actualizar un registro DNS

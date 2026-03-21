@@ -46,7 +46,7 @@ source_config
 source "${LIB_DIR}/portainer_api.sh" 2>/dev/null || true
 
 # ============================================================
-print_header "Paso 9 de 11 — Instalar Kopia Backup"
+print_header "Paso 9 de 12 — Instalar Kopia Backup"
 # ============================================================
 
 check_root

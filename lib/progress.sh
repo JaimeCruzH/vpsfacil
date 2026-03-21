@@ -20,7 +20,8 @@ declare -gA CORE_STEPS=(
     [8]="Portainer"
     [9]="Kopia Backup"
     [10]="File Browser"
-    [11]="Finalizar: Permisos y SSH"
+    [11]="Beszel Monitoring"
+    [12]="Finalizar: Permisos y SSH"
 )
 
 # ============================================================
@@ -125,7 +126,7 @@ progress_get_total_duration() {
 # ============================================================
 progress_show() {
     local completed_count=0
-    local total_count=11
+    local total_count=12
 
     local completed_steps=""
     if [[ -f "$PROGRESS_LOG" ]]; then
@@ -159,7 +160,7 @@ progress_show() {
     echo "║                                                               ║"
     echo "╠═══════════════════════════════════════════════════════════════╣"
 
-    for step_num in 1 2 3 4 5 6 7 8 9 10 11; do
+    for step_num in 1 2 3 4 5 6 7 8 9 10 11 12; do
         local step_name="${CORE_STEPS[$step_num]}"
         local status_icon="⏸"
         local info="[en espera]"

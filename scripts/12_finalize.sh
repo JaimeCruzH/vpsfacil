@@ -44,7 +44,7 @@ source_config
 source "${LIB_DIR}/portainer_api.sh" 2>/dev/null || true
 
 # ============================================================
-print_header "Paso 11 de 11 — Finalizar: Permisos y Seguridad SSH"
+print_header "Paso 12 de 12 — Finalizar: Permisos y Seguridad SSH"
 # ============================================================
 
 check_root

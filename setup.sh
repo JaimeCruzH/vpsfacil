@@ -421,6 +421,7 @@ _derive_config_vars() {
     export URL_PORTAINER="https://portainer.vpn.${DOMAIN}:9443"
     export URL_FILEBROWSER="http://files.vpn.${DOMAIN}:8080"
     export URL_KOPIA="https://kopia.vpn.${DOMAIN}:51515"
+    export URL_BESZEL="http://beszel.vpn.${DOMAIN}:8090"
 
     export CERT_FILE="${CERTS_DIR}/origin-cert.pem"
     export CERT_KEY="${CERTS_DIR}/origin-cert-key.pem"
@@ -468,7 +469,8 @@ declare -gA CORE_STEPS=(
     [8]="Portainer"
     [9]="Kopia Backup"
     [10]="File Browser"
-    [11]="Finalizar: Permisos y SSH"
+    [11]="Beszel Monitoring"
+    [12]="Finalizar: Permisos y SSH"
 )
 
 progress_init() {
@@ -552,7 +554,7 @@ progress_get_total_duration() {
 
 progress_show() {
     local completed_count=0
-    local total_count=11
+    local total_count=12
 
     local completed_steps=""
     if [[ -f "$PROGRESS_LOG" ]]; then
@@ -585,7 +587,7 @@ progress_show() {
     echo "║                                                               ║"
     echo "╠═══════════════════════════════════════════════════════════════╣"
 
-    for step_num in 1 2 3 4 5 6 7 8 9 10 11; do
+    for step_num in 1 2 3 4 5 6 7 8 9 10 11 12; do
         local step_name="${CORE_STEPS[$step_num]}"
         local status_icon="⏸"
         local info="[en espera]"
@@ -617,10 +619,14 @@ readonly PORT_TAILSCALE="41641"
 readonly PORT_PORTAINER="9443"
 readonly PORT_FILEBROWSER="8080"
 readonly PORT_KOPIA="51515"
+readonly PORT_BESZEL="8090"
+readonly PORT_BESZEL_AGENT="45876"
 
 readonly IMG_PORTAINER="portainer/portainer-ce:latest"
 readonly IMG_FILEBROWSER="filebrowser/filebrowser:latest"
 readonly IMG_KOPIA="kopia/kopia:latest"
+readonly IMG_BESZEL="henrygd/beszel:latest"
+readonly IMG_BESZEL_AGENT="henrygd/beszel-agent:latest"
 
 readonly TIMEOUT_DOCKER_START=60
 readonly TIMEOUT_APP_START=120
@@ -943,7 +949,8 @@ run_step 7  "06_setup_certificates.sh" "Configurar Certificados SSL"
 run_step 8  "08_install_portainer.sh"  "Instalar Portainer"
 run_step 9  "09_install_kopia.sh"      "Instalar Kopia Backup"
 run_step 10 "10_install_filebrowser.sh" "Instalar File Browser"
-run_step 11 "11_finalize.sh"           "Finalizar: Permisos y Seguridad SSH"
+run_step 11 "11_install_beszel.sh"     "Instalar Beszel Monitoring"
+run_step 12 "12_finalize.sh"           "Finalizar: Permisos y Seguridad SSH"
 
 # ============================================================
 # RESUMEN FINAL
@@ -988,7 +995,11 @@ echo -e "    ${COLOR_BOLD_WHITE}File Browser${COLOR_RESET} (gestor de archivos):
 echo -e "      URL:        ${COLOR_CYAN}${URL_FILEBROWSER}${COLOR_RESET}"
 echo -e "      Auth:       ${COLOR_GREEN}Sin login (VPN es la seguridad)${COLOR_RESET}"
 echo ""
-echo -e "  ${COLOR_BOLD_WHITE}Conexión SSH (después de paso 11):${COLOR_RESET}"
+echo -e "    ${COLOR_BOLD_WHITE}Beszel${COLOR_RESET} (monitoreo del servidor):"
+echo -e "      URL:        ${COLOR_CYAN}${URL_BESZEL}${COLOR_RESET}"
+echo -e "      Auth:       ${COLOR_GREEN}Crear cuenta en primer acceso${COLOR_RESET}"
+echo ""
+echo -e "  ${COLOR_BOLD_WHITE}Conexión SSH (después de paso 12):${COLOR_RESET}"
 echo -e "    Usuario:      ${COLOR_CYAN}${ADMIN_USER}${COLOR_RESET}"
 echo -e "    Auth:         ${COLOR_CYAN}Llave SSH (root deshabilitado)${COLOR_RESET}"
 echo ""

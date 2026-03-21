@@ -42,7 +42,7 @@ source "${LIB_DIR}/utils.sh"
 source_config
 
 # ============================================================
-print_header "Paso 4 de 11 — Instalar Docker & Docker Compose"
+print_header "Paso 4 de 12 — Instalar Docker & Docker Compose"
 # ============================================================
 
 check_root
