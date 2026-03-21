@@ -288,7 +288,7 @@ DOCKERFILE
     log_process "Puede tardar 3-5 minutos la primera vez..."
 
     cd "$APP_DIR"
-    if ! docker build --progress=plain -t openclaw-vpsfacil:latest . 2>&1; then
+    if ! docker build --network=host --progress=plain -t openclaw-vpsfacil:latest . 2>&1; then
         log_error "Falló la construcción de la imagen Docker."
         log_info  "Revisa el error arriba para más detalles."
         return 1
