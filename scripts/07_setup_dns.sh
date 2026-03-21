@@ -9,9 +9,7 @@
 #   3. Obtiene la IP de Tailscale del servidor
 #   4. Crea registros DNS tipo A para cada app:
 #      portainer.vpn.DOMAIN → Tailscale IP
-#      n8n.vpn.DOMAIN       → Tailscale IP
 #      files.vpn.DOMAIN     → Tailscale IP
-#      openclaw.vpn.DOMAIN  → Tailscale IP
 #      kopia.vpn.DOMAIN     → Tailscale IP
 #   5. Verifica que los registros se crearon correctamente
 #
@@ -49,7 +47,7 @@ source "${LIB_DIR}/utils.sh"
 source_config
 
 # ============================================================
-print_header "Paso 7 de 11 — Configurar DNS en Cloudflare"
+print_header "Paso 6 de 11 — Configurar DNS en Cloudflare"
 # ============================================================
 
 check_root
@@ -59,9 +57,7 @@ log_info "Cloudflare para que tus apps tengan URLs amigables."
 echo ""
 log_info "Cada app tendrá su propio subdominio:"
 echo -e "   ${COLOR_CYAN}portainer.vpn.${DOMAIN}${COLOR_RESET} → IP Tailscale"
-echo -e "   ${COLOR_CYAN}n8n.vpn.${DOMAIN}${COLOR_RESET}       → IP Tailscale"
 echo -e "   ${COLOR_CYAN}files.vpn.${DOMAIN}${COLOR_RESET}     → IP Tailscale"
-echo -e "   ${COLOR_CYAN}openclaw.vpn.${DOMAIN}${COLOR_RESET}  → IP Tailscale"
 echo -e "   ${COLOR_CYAN}kopia.vpn.${DOMAIN}${COLOR_RESET}     → IP Tailscale"
 echo ""
 
@@ -183,9 +179,7 @@ log_step "Creando registros DNS en Cloudflare"
 # Lista de subdominios a crear (prefijo → nombre completo)
 declare -A SUBDOMINIOS=(
     ["portainer"]="portainer.vpn.${DOMAIN}"
-    ["n8n"]="n8n.vpn.${DOMAIN}"
     ["files"]="files.vpn.${DOMAIN}"
-    ["openclaw"]="openclaw.vpn.${DOMAIN}"
     ["kopia"]="kopia.vpn.${DOMAIN}"
 )
 
@@ -313,5 +307,5 @@ echo -e "  ${COLOR_BOLD_WHITE}Importante:${COLOR_RESET}"
 echo -e "    ${COLOR_YELLOW}Estos dominios solo funcionan con Tailscale VPN activo${COLOR_RESET}"
 echo -e "    Desde internet sin VPN → ${COLOR_RED}sin acceso${COLOR_RESET}"
 echo ""
-log_info "Próximo paso: Instalar Portainer (opción 9)"
+log_info "Próximo paso: Configurar Certificados SSL (paso 7)"
 echo ""

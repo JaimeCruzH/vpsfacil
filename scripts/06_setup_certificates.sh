@@ -47,7 +47,7 @@ source "${LIB_DIR}/utils.sh"
 source_config
 
 # ============================================================
-print_header "Paso 6 de 11 — Certificados SSL (Let's Encrypt)"
+print_header "Paso 7 de 11 — Certificados SSL (Let's Encrypt)"
 # ============================================================
 
 check_root
@@ -55,12 +55,12 @@ check_root
 log_info "Obtendremos un certificado SSL wildcard para:"
 echo -e "   ${COLOR_CYAN}*.vpn.${DOMAIN}${COLOR_RESET}"
 echo ""
-log_info "Este certificado cubre TODAS tus apps (Portainer, N8N,"
-log_info "File Browser, Kopia, OpenClaw) con un solo certificado"
+log_info "Este certificado cubre TODAS tus apps (Portainer,"
+log_info "File Browser, Kopia) con un solo certificado"
 log_info "reconocido por todos los navegadores."
 echo ""
-log_info "El proceso es completamente automático — solo necesitas"
-log_info "un API token de Cloudflare con permiso para editar DNS."
+log_info "El proceso es completamente automático usando el"
+log_info "token de Cloudflare configurado en el paso anterior."
 echo ""
 
 # ============================================================
@@ -95,75 +95,35 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y -q \
 log_success "certbot $(certbot --version 2>&1 | head -1) instalado ✓"
 
 # ============================================================
-# 2. OBTENER API TOKEN DE CLOUDFLARE
+# 2. OBTENER API TOKEN DE CLOUDFLARE (guardado en paso 6)
 # ============================================================
-log_step "Configurar API token de Cloudflare"
+log_step "Cargando token de Cloudflare"
 
-echo ""
-windows_instruction "CREAR API TOKEN EN CLOUDFLARE
-
-1. Abre: https://dash.cloudflare.com/profile/api-tokens
-
-2. Haz clic en 'Create Token'
-
-3. Usa la plantilla 'Edit zone DNS' (botón 'Use template')
-
-4. En 'Zone Resources':
-   Selecciona: Include → Specific zone → ${DOMAIN}
-
-5. Haz clic en 'Continue to summary' → 'Create Token'
-
-6. COPIA el token que aparece (solo se muestra una vez)"
-
-echo ""
-
-# Verificar si ya tenemos el token guardado (del paso 7)
 CF_CREDS_FILE="/root/.cloudflare-certbot.ini"
 CF_ENV_FILE="${APPS_DIR}/.cloudflare.env"
+CF_API_TOKEN=""
 
-if [[ -f "$CF_ENV_FILE" ]] && grep -q "CF_API_TOKEN" "$CF_ENV_FILE" 2>/dev/null; then
-    EXISTING_TOKEN=$(grep "CF_API_TOKEN=" "$CF_ENV_FILE" | cut -d= -f2 | tr -d '"')
-    if [[ -n "$EXISTING_TOKEN" ]]; then
-        log_info "Se encontró un API token de Cloudflare guardado previamente."
-        if confirm "¿Usar el token guardado?"; then
-            CF_API_TOKEN="$EXISTING_TOKEN"
-        else
-            CF_API_TOKEN=$(prompt_input "Pega tu API token de Cloudflare")
-        fi
-    fi
-else
-    CF_API_TOKEN=$(prompt_input "Pega tu API token de Cloudflare")
+# Buscar token guardado por el paso 6 (DNS Cloudflare)
+if [[ -f "$CF_ENV_FILE" ]]; then
+    CF_API_TOKEN=$(grep "CF_API_TOKEN=" "$CF_ENV_FILE" 2>/dev/null | cut -d= -f2 | tr -d '"' || echo "")
 fi
-
-CF_API_TOKEN="${CF_API_TOKEN//$'\r'/}"
 
 if [[ -z "$CF_API_TOKEN" ]]; then
-    log_error "El API token no puede estar vacío"
-    exit 1
-fi
-
-# ============================================================
-# 3. VERIFICAR TOKEN CON LA API DE CLOUDFLARE
-# ============================================================
-log_step "Verificando token de Cloudflare"
-
-log_process "Verificando token..."
-CF_VERIFY=$(curl -s -X GET "https://api.cloudflare.com/client/v4/user/tokens/verify" \
-    -H "Authorization: Bearer ${CF_API_TOKEN}" \
-    -H "Content-Type: application/json")
-
-if echo "$CF_VERIFY" | grep -q '"status":"active"'; then
-    log_success "Token válido y activo ✓"
+    log_warning "No se encontró el token de Cloudflare del paso anterior."
+    CF_API_TOKEN=$(prompt_input "Pega tu API token de Cloudflare")
+    CF_API_TOKEN="${CF_API_TOKEN//$'\r'/}"
+    if [[ -z "$CF_API_TOKEN" ]]; then
+        log_error "El API token no puede estar vacío"
+        exit 1
+    fi
 else
-    log_error "Token inválido o sin permisos suficientes"
-    log_info  "Verifica que el token tenga permiso: Zone → DNS → Edit"
-    exit 1
+    log_success "Token de Cloudflare cargado del paso anterior ✓"
 fi
 
 # ============================================================
-# 4. GUARDAR CREDENCIALES PARA CERTBOT
+# 3. GUARDAR CREDENCIALES PARA CERTBOT
 # ============================================================
-log_step "Guardando credenciales"
+log_step "Configurando credenciales para certbot"
 
 cat > "$CF_CREDS_FILE" << EOF
 # Cloudflare API token para certbot DNS-01 challenge
@@ -171,20 +131,10 @@ dns_cloudflare_api_token = ${CF_API_TOKEN}
 EOF
 
 chmod 600 "$CF_CREDS_FILE"
-log_success "Credenciales guardadas en ${CF_CREDS_FILE} (permisos 600) ✓"
-
-# Guardar también para el paso 7 (DNS setup) si no existe
-if [[ ! -f "$CF_ENV_FILE" ]]; then
-    mkdir -p "${APPS_DIR}"
-    cat > "$CF_ENV_FILE" << EOF
-# Cloudflare API — VPSfacil
-CF_API_TOKEN="${CF_API_TOKEN}"
-EOF
-    chmod 600 "$CF_ENV_FILE"
-fi
+log_success "Credenciales de certbot configuradas ✓"
 
 # ============================================================
-# 5. OBTENER CERTIFICADO WILDCARD CON LET'S ENCRYPT
+# 4. OBTENER CERTIFICADO WILDCARD CON LET'S ENCRYPT
 # ============================================================
 log_step "Obteniendo certificado SSL de Let's Encrypt"
 
@@ -224,7 +174,7 @@ fi
 log_success "Certificado obtenido exitosamente ✓"
 
 # ============================================================
-# 6. COPIAR CERTIFICADOS A LA CARPETA DE APPS
+# 5. COPIAR CERTIFICADOS A LA CARPETA DE APPS
 # ============================================================
 log_step "Instalando certificados en ${CERTS_DIR}"
 
@@ -242,7 +192,7 @@ chown "${ADMIN_USER}:${ADMIN_USER}" "${CERTS_DIR}" "${CERT_FILE}" "${CERT_KEY}"
 log_success "Certificados instalados en ${CERTS_DIR} ✓"
 
 # ============================================================
-# 7. CONFIGURAR RENOVACIÓN AUTOMÁTICA
+# 6. CONFIGURAR RENOVACIÓN AUTOMÁTICA
 # ============================================================
 log_step "Configurando renovación automática"
 
@@ -262,7 +212,7 @@ chmod 600 "\${CERTS_DIR}/origin-cert-key.pem"
 chown ${ADMIN_USER}:${ADMIN_USER} "\${CERTS_DIR}/origin-cert.pem" "\${CERTS_DIR}/origin-cert-key.pem"
 
 # Reiniciar containers que usan los certs
-cd "\${CERTS_DIR}/.." && for app in portainer n8n filebrowser kopia; do
+cd "\${CERTS_DIR}/.." && for app in portainer filebrowser kopia; do
     if docker compose -f "\${app}/docker-compose.yml" ps -q 2>/dev/null | grep -q .; then
         docker compose -f "\${app}/docker-compose.yml" restart 2>/dev/null || true
     fi
@@ -284,7 +234,7 @@ else
 fi
 
 # ============================================================
-# 8. VERIFICAR CERTIFICADO
+# 7. VERIFICAR CERTIFICADO
 # ============================================================
 log_step "Verificando certificado instalado"
 
@@ -315,5 +265,5 @@ echo -e "    ${COLOR_CYAN}${CERT_KEY}${COLOR_RESET} (permisos 600)"
 echo ""
 echo -e "  ${COLOR_BOLD_WHITE}Renovación:${COLOR_RESET} Automática — no requiere intervención manual"
 echo ""
-log_info "Próximo paso: Configurar DNS en Cloudflare (opción 7)"
+log_info "Próximo paso: Instalar Portainer (paso 8)"
 echo ""
