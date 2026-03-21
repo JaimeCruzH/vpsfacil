@@ -48,6 +48,9 @@ print_header "Paso 8 de 11 — Instalar Portainer"
 
 check_root
 
+# URL local para llamadas API (localhost porque DNS puede no resolver localmente)
+PORTAINER_URL="https://localhost:9443"
+
 log_info "Portainer es la interfaz web para gestionar todos los"
 log_info "contenedores Docker de tu servidor."
 log_info ""
