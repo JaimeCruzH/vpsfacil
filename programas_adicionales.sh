@@ -218,10 +218,11 @@ install_openclaw() {
         log_info "Opciones:"
         log_info "  1) Reinstalar (mantiene datos y configuración existente)"
         log_info "  2) Instalación limpia (BORRA todos los datos y configuración)"
-        log_info "  3) Cancelar"
+        log_info "  3) Desinstalar (elimina el programa y todos sus datos)"
+        log_info "  4) Cancelar"
         echo ""
         local opt
-        opt=$(prompt_input "¿Qué deseas hacer?" "3")
+        opt=$(prompt_input "¿Qué deseas hacer?" "4")
         case "$opt" in
             1)
                 log_process "Deteniendo contenedor anterior..."
@@ -246,6 +247,27 @@ install_openclaw() {
                 log_process "Eliminando todos los datos..."
                 rm -rf "${APP_DIR}"
                 log_success "Datos eliminados. Iniciando instalación limpia ✓"
+                ;;
+            3)
+                echo ""
+                log_warning "Esto eliminará permanentemente:"
+                log_warning "  - El contenedor e imagen Docker de OpenClaw"
+                log_warning "  - Toda la configuración y datos del workspace"
+                log_warning "  - Directorio: ${APP_DIR}"
+                echo ""
+                if ! confirm "¿Estás seguro de que quieres desinstalar OpenClaw por completo?"; then
+                    log_info "Cancelado."
+                    return 0
+                fi
+                log_process "Deteniendo y eliminando contenedor..."
+                docker stop openclaw 2>/dev/null || true
+                docker rm   openclaw 2>/dev/null || true
+                log_process "Eliminando imagen Docker..."
+                docker rmi openclaw-vpsfacil:latest 2>/dev/null || true
+                log_process "Eliminando todos los datos..."
+                rm -rf "${APP_DIR}"
+                log_success "OpenClaw desinstalado completamente ✓"
+                return 0
                 ;;
             *)
                 log_info "Cancelado."
