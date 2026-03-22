@@ -519,7 +519,39 @@ with open(f, 'w') as fp:
 print('OK')
 " && log_success "Orígenes VPN agregados ✓" || log_warning "No se pudo configurar los orígenes automáticamente"
             docker restart openclaw > /dev/null 2>&1
-            log_success "Contenedor reiniciado con nueva configuración ✓"
+            sleep 3
+            docker restart openclaw-nginx > /dev/null 2>&1
+            log_success "Contenedores reiniciados con nueva configuración ✓"
+
+            # Leer token guardado por el onboarding y mostrar URL completa
+            local SAVED_TOKEN
+            SAVED_TOKEN=$(python3 -c "
+import json
+with open('${CONFIG_FILE}') as f:
+    cfg = json.load(f)
+print(cfg.get('gateway', {}).get('auth', {}).get('token', ''))
+" 2>/dev/null || echo "")
+
+            echo ""
+            print_separator
+            echo ""
+            log_success "OpenClaw listo para usar"
+            echo ""
+            echo -e "  ${COLOR_BOLD_WHITE}Abre esta URL en tu navegador (con Tailscale VPN activo):${COLOR_RESET}"
+            echo ""
+            if [[ -n "$SAVED_TOKEN" ]]; then
+                echo -e "  ${COLOR_CYAN}https://openclaw.vpn.${DOMAIN}:${PORT_OPENCLAW_HTTP}/#token=${SAVED_TOKEN}${COLOR_RESET}"
+                echo ""
+                log_info "La URL incluye el token — el primer acceso se aprobará automáticamente."
+            else
+                echo -e "  ${COLOR_CYAN}https://openclaw.vpn.${DOMAIN}:${PORT_OPENCLAW_HTTP}${COLOR_RESET}"
+                echo ""
+                log_info "Ejecuta esto para obtener la URL con token:"
+                log_info "  docker exec -it openclaw /pnpm/openclaw dashboard --no-open"
+                log_info "Reemplaza '127.0.0.1:18789' por 'openclaw.vpn.${DOMAIN}:${PORT_OPENCLAW_HTTP}' en la URL generada."
+            fi
+            echo ""
+            print_separator
         fi
     else
         echo ""
