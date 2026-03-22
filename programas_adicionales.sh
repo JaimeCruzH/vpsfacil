@@ -344,16 +344,45 @@ DOCKERFILE
     fi
     log_success "Imagen openclaw-vpsfacil:latest construida ✓"
 
-    # ── 6. Docker Compose ─────────────────────────────────────
+    # ── 6. Nginx config (proxy HTTPS → OpenClaw HTTP) ─────────
+    log_step "Generando configuración nginx HTTPS"
+
+    mkdir -p "${APP_DIR}/nginx"
+    cat > "${APP_DIR}/nginx/openclaw.conf" << NGINXCONF
+server {
+    listen 18790 ssl;
+    server_name openclaw.vpn.${DOMAIN};
+
+    ssl_certificate     /certs/origin-cert.pem;
+    ssl_certificate_key /certs/origin-cert-key.pem;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_ciphers         HIGH:!aNULL:!MD5;
+
+    location / {
+        proxy_pass         http://openclaw:18789;
+        proxy_http_version 1.1;
+        proxy_set_header   Upgrade \$http_upgrade;
+        proxy_set_header   Connection "upgrade";
+        proxy_set_header   Host \$host;
+        proxy_set_header   X-Forwarded-Proto https;
+        proxy_read_timeout 86400;
+    }
+}
+NGINXCONF
+
+    chown -R "${ADMIN_USER}:${ADMIN_USER}" "${APP_DIR}/nginx"
+    log_success "Configuración nginx generada ✓"
+
+    # ── 7. Docker Compose ─────────────────────────────────────
     log_step "Generando docker-compose.yml"
 
     local COMPOSE_CONTENT
     COMPOSE_CONTENT=$(cat << EOF
 # ============================================================
 # OpenClaw — VPSfacil
-# Acceso: http://openclaw.vpn.${DOMAIN}:${PORT_OPENCLAW_WS}
+# Acceso: https://openclaw.vpn.${DOMAIN}:${PORT_OPENCLAW_HTTP}
 # SOLO vía Tailscale VPN
-# El acceso VPN está gestionado por UFW + DNS, no por tailscale serve.
+# nginx termina SSL y proxea a OpenClaw internamente.
 # ============================================================
 services:
   openclaw:
@@ -365,11 +394,8 @@ services:
       TERM: xterm
       TZ: ${TIMEZONE:-America/Santiago}
       OPENCLAW_GATEWAY_TOKEN: "${GATEWAY_TOKEN}"
-      OPENCLAW_ALLOW_INSECURE_PRIVATE_WS: "true"
-      OPENCLAW_GATEWAY_CONTROL_UI_ALLOWED_ORIGINS: "http://openclaw.vpn.${DOMAIN}:${PORT_OPENCLAW_WS}"
     ports:
-      - "${PORT_OPENCLAW_WS}:18789"
-      - "${PORT_OPENCLAW_HTTP}:18790"
+      - "127.0.0.1:${PORT_OPENCLAW_WS}:18789"
     volumes:
       - ${APP_DIR}/config:/home/node/.openclaw
       - ${APP_DIR}/data:/home/node/.openclaw/workspace
@@ -379,6 +405,21 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
+    networks:
+      - vpsfacil-net
+
+  openclaw-nginx:
+    image: nginx:alpine
+    container_name: openclaw-nginx
+    restart: unless-stopped
+    ports:
+      - "${PORT_OPENCLAW_HTTP}:18790"
+    volumes:
+      - ${APP_DIR}/nginx/openclaw.conf:/etc/nginx/conf.d/openclaw.conf:ro
+      - ${CERTS_DIR}/origin-cert.pem:/certs/origin-cert.pem:ro
+      - ${CERTS_DIR}/origin-cert-key.pem:/certs/origin-cert-key.pem:ro
+    depends_on:
+      - openclaw
     networks:
       - vpsfacil-net
 
@@ -406,6 +447,8 @@ EOF
 
     log_process "Esperando que OpenClaw inicie..."
     wait_for_port "localhost" "${PORT_OPENCLAW_WS}" 120
+    log_process "Esperando que nginx HTTPS inicie..."
+    wait_for_port "localhost" "${PORT_OPENCLAW_HTTP}" 30
 
     log_success "OpenClaw está corriendo ✓"
 
@@ -420,7 +463,7 @@ EOF
     log_success "OpenClaw instalado exitosamente"
     echo ""
     echo -e "  ${COLOR_BOLD_WHITE}Acceso (requiere Tailscale VPN):${COLOR_RESET}"
-    echo -e "    URL:     ${COLOR_CYAN}http://openclaw.vpn.${DOMAIN}:${PORT_OPENCLAW_WS}${COLOR_RESET}"
+    echo -e "    URL:     ${COLOR_CYAN}https://openclaw.vpn.${DOMAIN}:${PORT_OPENCLAW_HTTP}${COLOR_RESET}"
     echo -e "    Token:   ${COLOR_CYAN}${GATEWAY_TOKEN}${COLOR_RESET}"
     echo ""
     echo -e "  ${COLOR_BOLD_WHITE}Directorio:${COLOR_RESET}  ${COLOR_CYAN}${APP_DIR}${COLOR_RESET}"
@@ -458,19 +501,23 @@ EOF
         local CONFIG_FILE="${APP_DIR}/config/openclaw.json"
         if [[ -f "$CONFIG_FILE" ]]; then
             log_process "Configurando origen permitido para acceso VPN..."
-            local OPENCLAW_ORIGIN="http://openclaw.vpn.${DOMAIN}:${PORT_OPENCLAW_WS}"
             python3 -c "
-import json, sys
+import json
 f = '${CONFIG_FILE}'
 with open(f) as fp:
     cfg = json.load(fp)
 origins = cfg.setdefault('gateway', {}).setdefault('controlUi', {}).setdefault('allowedOrigins', [])
-if '${OPENCLAW_ORIGIN}' not in origins:
-    origins.append('${OPENCLAW_ORIGIN}')
+nuevos = [
+    'https://openclaw.vpn.${DOMAIN}:${PORT_OPENCLAW_HTTP}',
+    'http://openclaw.vpn.${DOMAIN}:${PORT_OPENCLAW_WS}',
+]
+for o in nuevos:
+    if o not in origins:
+        origins.append(o)
 with open(f, 'w') as fp:
     json.dump(cfg, fp, indent=2)
 print('OK')
-" && log_success "Origen VPN agregado ✓" || log_warning "No se pudo configurar el origen automáticamente"
+" && log_success "Orígenes VPN agregados ✓" || log_warning "No se pudo configurar los orígenes automáticamente"
             docker restart openclaw > /dev/null 2>&1
             log_success "Contenedor reiniciado con nueva configuración ✓"
         fi
