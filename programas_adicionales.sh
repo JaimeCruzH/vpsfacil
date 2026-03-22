@@ -216,18 +216,42 @@ install_openclaw() {
         log_warning "OpenClaw ya está instalado."
         echo ""
         log_info "Opciones:"
-        log_info "  1) Reinstalar (actualiza la imagen)"
-        log_info "  2) Cancelar"
+        log_info "  1) Reinstalar (mantiene datos y configuración existente)"
+        log_info "  2) Instalación limpia (BORRA todos los datos y configuración)"
+        log_info "  3) Cancelar"
         echo ""
         local opt
-        opt=$(prompt_input "¿Qué deseas hacer?" "2")
-        if [[ "$opt" != "1" ]]; then
-            log_info "Cancelado."
-            return 0
-        fi
-        log_process "Deteniendo contenedor anterior..."
-        docker stop openclaw 2>/dev/null || true
-        docker rm   openclaw 2>/dev/null || true
+        opt=$(prompt_input "¿Qué deseas hacer?" "3")
+        case "$opt" in
+            1)
+                log_process "Deteniendo contenedor anterior..."
+                docker stop openclaw 2>/dev/null || true
+                docker rm   openclaw 2>/dev/null || true
+                ;;
+            2)
+                echo ""
+                log_warning "Esto eliminará permanentemente:"
+                log_warning "  - Toda la configuración de OpenClaw (credenciales, onboarding)"
+                log_warning "  - Todos los datos del workspace"
+                log_warning "  - El token de gateway actual"
+                log_warning "  - Directorio: ${APP_DIR}"
+                echo ""
+                if ! confirm "¿Estás seguro de que quieres borrar todo y empezar de cero?"; then
+                    log_info "Cancelado."
+                    return 0
+                fi
+                log_process "Deteniendo y eliminando contenedor..."
+                docker stop openclaw 2>/dev/null || true
+                docker rm   openclaw 2>/dev/null || true
+                log_process "Eliminando todos los datos..."
+                rm -rf "${APP_DIR}"
+                log_success "Datos eliminados. Iniciando instalación limpia ✓"
+                ;;
+            *)
+                log_info "Cancelado."
+                return 0
+                ;;
+        esac
     fi
 
     check_docker || { log_error "Docker no está disponible."; return 1; }
@@ -320,6 +344,7 @@ services:
       TZ: ${TIMEZONE:-America/Santiago}
       OPENCLAW_GATEWAY_TOKEN: "${GATEWAY_TOKEN}"
       OPENCLAW_ALLOW_INSECURE_PRIVATE_WS: "true"
+      OPENCLAW_GATEWAY_CONTROL_UI_ALLOWED_ORIGINS: "http://openclaw.vpn.${DOMAIN}:${PORT_OPENCLAW_WS}"
     ports:
       - "${PORT_OPENCLAW_WS}:18789"
       - "${PORT_OPENCLAW_HTTP}:18790"
@@ -406,6 +431,27 @@ EOF
         docker exec -it openclaw /pnpm/openclaw onboard
         echo ""
         log_success "Onboarding completado."
+
+        # Agregar origen permitido para acceso vía Tailscale VPN
+        local CONFIG_FILE="${APP_DIR}/config/openclaw.json"
+        if [[ -f "$CONFIG_FILE" ]]; then
+            log_process "Configurando origen permitido para acceso VPN..."
+            local OPENCLAW_ORIGIN="http://openclaw.vpn.${DOMAIN}:${PORT_OPENCLAW_WS}"
+            python3 -c "
+import json, sys
+f = '${CONFIG_FILE}'
+with open(f) as fp:
+    cfg = json.load(fp)
+origins = cfg.setdefault('gateway', {}).setdefault('controlUi', {}).setdefault('allowedOrigins', [])
+if '${OPENCLAW_ORIGIN}' not in origins:
+    origins.append('${OPENCLAW_ORIGIN}')
+with open(f, 'w') as fp:
+    json.dump(cfg, fp, indent=2)
+print('OK')
+" && log_success "Origen VPN agregado ✓" || log_warning "No se pudo configurar el origen automáticamente"
+            docker restart openclaw > /dev/null 2>&1
+            log_success "Contenedor reiniciado con nueva configuración ✓"
+        fi
     else
         echo ""
         log_info "Puedes ejecutarlo más tarde con:"
