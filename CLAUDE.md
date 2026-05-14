@@ -42,7 +42,6 @@
 │ Cloudflare DNS                                               │
 │ n8n.vpn.agentexperto.work      → 100.91.x.x (Tailscale IP)  │
 │ files.vpn.agentexperto.work    → 100.91.x.x (Tailscale IP)  │
-│ openclaw.vpn.agentexperto.work → 100.91.x.x (Tailscale IP)  │
 │ portainer.vpn.agentexperto.work→ 100.91.x.x (Tailscale IP)  │
 │ kopia.vpn.agentexperto.work    → 100.91.x.x (Tailscale IP)  │
 └──────────────────────────────────────────────────────────────┘
@@ -53,8 +52,7 @@
 │ │  └─ *.vpn.agentexperto.work (renovación automática cada 60 días)              │
 │ ├─ N8N          (puerto 5678, solo Tailscale IP)             │
 │ ├─ File Browser (puerto 8080, solo Tailscale IP)             │
-│ ├─ OpenClaw     (puerto 18789, solo Tailscale IP)            │
-│ ├─ Portainer    (puerto 9000, solo Tailscale IP)             │
+│ ├─ Portainer    (puerto 9443, solo Tailscale IP)             │
 │ └─ Kopia        (puerto 51515, solo Tailscale IP)            │
 └──────────────────────────────────────────────────────────────┘
 ```
@@ -156,12 +154,6 @@ Todas las aplicaciones se instalan bajo `/home/${ADMIN_USER}/apps/`:
 │   ├── data/
 │   └── postgres/               # Base de datos PostgreSQL
 │
-├── openclaw/                   # OpenClaw (opcional, solo VPN)
-│   ├── docker-compose.yml
-│   ├── .env
-│   ├── config/                 # → /home/node/.openclaw
-│   └── data/                   # → /home/node/.openclaw/workspace
-│
 └── backups/                    # Almacén de backups de Kopia
 ```
 
@@ -187,7 +179,7 @@ El usuario admin se crea al inicio, el hardening SSH se aplica al final.
 | 11 | `11_install_beszel.sh` | Beszel Monitoring (hub + agent, CPU/RAM/disco/red) |
 | 12 | `12_finalize.sh` | Barrido de permisos, verificar SSH del admin, hardening SSH, fail2ban |
 
-**Nota:** Las aplicaciones opcionales (N8N, OpenClaw) se instalarán con un script separado en el futuro.
+**Nota:** Las aplicaciones opcionales (como N8N) se instalan ejecutando `bash apps/n8n.sh` después de completar los 12 pasos core.
 
 ---
 
@@ -218,10 +210,8 @@ Con esto:
 |--------|-----------|------------|--------|
 | 22 | TCP | SSH | Internet (temporal, luego solo Tailscale) |
 | 41641 | UDP | Tailscale VPN | Internet (WireGuard, requerido) |
-| 9000 | TCP | Portainer | Solo Tailscale IP |
-| 5678 | TCP | N8N | Solo Tailscale IP |
-| 18789 | TCP | OpenClaw WebSocket | Solo Tailscale IP |
-| 18790 | TCP | OpenClaw HTTP | Solo Tailscale IP |
+| 9443 | TCP | Portainer | Solo Tailscale IP |
+| 5678 | TCP | N8N (opcional) | Solo Tailscale IP |
 | 8080 | TCP | File Browser | Solo Tailscale IP |
 | 8090 | TCP | Beszel Hub | Solo Tailscale IP |
 | 45876 | TCP | Beszel Agent | Host network (local) |
@@ -277,20 +267,16 @@ VPSfacil/
 │   ├── 11_install_beszel.sh         # Paso 11: Beszel Monitoring (hub + agent)
 │   └── 12_finalize.sh               # Paso 12: Permisos + hardening SSH + fail2ban
 │
-├── apps/                            # Instaladores de apps opcionales (futuro, script separado)
-│   ├── n8n.sh                       # N8N + PostgreSQL
-│   └── openclaw.sh                  # OpenClaw IA
+├── apps/                            # Instaladores de apps opcionales
+│   └── n8n.sh                       # N8N + PostgreSQL
 │
-├── lib/                             # Funciones reutilizables
-│   ├── colors.sh                    # Definiciones de colores ANSI
-│   ├── utils.sh                     # Utilidades comunes bash
-│   ├── config.sh                    # Variables globales y configuración
-│   ├── progress.sh                  # Tracking de progreso visual (12 pasos)
-│   ├── portainer_api.sh             # Wrappers REST API de Portainer
-│   └── cloudflare_api.sh            # Wrappers API DNS de Cloudflare
-│
-└── config/
-    └── defaults.conf                # Puertos, rutas y timeouts por defecto
+└── lib/                             # Funciones reutilizables
+    ├── colors.sh                    # Definiciones de colores ANSI
+    ├── utils.sh                     # Utilidades comunes bash
+    ├── config.sh                    # Variables globales y configuración
+    ├── progress.sh                  # Tracking de progreso visual (12 pasos)
+    ├── portainer_api.sh             # Wrappers REST API de Portainer
+    └── install_prompts.sh           # Recolección de credenciales al inicio
 ```
 
 ---
@@ -400,45 +386,6 @@ Todas las rutas persistentes usan rutas relativas: `./data/`, `./config/`
 
 ## Notas Específicas por Aplicación
 
-### OpenClaw
-
-**Repositorio:** https://github.com/openclaw/openclaw
-
-**Descripción:** Asistente de IA personal que conecta múltiples plataformas de mensajería (WhatsApp, Telegram, Slack, Discord, Google Chat, Signal, iMessage).
-
-**Detalles Docker:**
-- **Imagen base:** node:24-bookworm
-- **Gestor de paquetes:** pnpm
-- **Usuario contenedor:** node (no-root)
-- **Entry point:** `node openclaw.mjs gateway --allow-unconfigured`
-- **Puertos:** 18789 (WebSocket principal), 18790 (secundario)
-- **Health check:** Cada 30 segundos en puerto 18789
-
-**RESTRICCIÓN DE SEGURIDAD: SOLO VPN**
-
-OpenClaw NUNCA debe exponerse a internet público porque:
-1. Las credenciales de Claude (session keys, cookies) son extremadamente sensibles
-2. La documentación oficial recomienda Tailscale Serve/Funnel para acceso remoto
-3. Exponer las credenciales comprometería la cuenta de Claude
-
-**Variables de Entorno Requeridas:**
-```
-OPENCLAW_GATEWAY_TOKEN          # Token de autenticación del gateway
-OPENCLAW_ALLOW_INSECURE_PRIVATE_WS=true  # Para despliegue local
-CLAUDE_AI_SESSION_KEY           # Credencial Claude AI (SENSIBLE)
-CLAUDE_WEB_SESSION_KEY          # Credencial Claude web (SENSIBLE)
-CLAUDE_WEB_COOKIE               # Cookie de autenticación Claude (SENSIBLE)
-TZ=America/Santiago             # Zona horaria
-```
-
-**Almacenamiento Persistente:**
-```
-./config/ → /home/node/.openclaw
-./data/   → /home/node/.openclaw/workspace
-```
-
-**Permisos del .env:** 600 (solo lectura del propietario)
-
 ### N8N
 
 **Imagen:** docker.n8n.io/n8nio/n8n:latest
@@ -464,7 +411,6 @@ TZ=America/Santiago             # Zona horaria
 5. **Certificados:** Clave privada con permisos 600
 6. **Cloudflare:** Tokens API en `.env`, nunca en git
 7. **Backups:** Kopia configurado con storage encriptado
-8. **OpenClaw:** Nunca exponer a internet, siempre solo VPN
 
 ---
 
@@ -482,8 +428,8 @@ TZ=America/Santiago             # Zona horaria
 - [x] Estructura de carpetas creada
 - [x] CLAUDE.md actualizado
 - [x] GitHub configurado
-- [x] Scripts core en desarrollo (pasos 1-12, incluye Beszel)
+- [x] Scripts core completos (pasos 1-12, incluye Beszel)
+- [x] App opcional N8N + PostgreSQL (`apps/n8n.sh`)
 - [ ] Pruebas en VPS fresco
-- [ ] Script de apps opcionales (futuro, separado)
 
 **Arquitectura v2:** Fase única como root, 12 pasos secuenciales, hardening SSH al final.

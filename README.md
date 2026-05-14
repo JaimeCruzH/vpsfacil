@@ -1,209 +1,154 @@
-# VPSfacil - Automated VPS Installation System
+# VPSfacil - Sistema Automatizado de Instalación en VPS
 
-**VPSfacil** is an interactive, automated installation system that enables non-technical users to deploy a complete VPS stack on Contabo (Debian 12) with a single command.
+**VPSfacil** es una herramienta interactiva y automatizada para configurar un VPS con Debian 12, diseñada para desplegar un stack completo de aplicaciones con un solo comando.
 
-## Quick Start
+## Inicio Rápido
 
-### Prerequisites
-- Contabo VPS running Debian 12
-- SSH access to VPS (via root or sudo user)
-- Domain: `agentexperto.work` with Cloudflare DNS
-- Windows 11 PC with Bitvise SSH Client
+### Requisitos
+- VPS con Debian 12 (recomendado: Contabo)
+- Acceso SSH como root
+- Dominio propio con DNS en Cloudflare
+- PC Windows con Bitvise SSH Client
 
-### Installation Command
+### Comando de instalación
 
-Run this command on your Debian 12 VPS:
+Ejecutar en el VPS:
 
 ```bash
-bash <(curl -sSL setup.agentexperto.work)
+bash <(curl -sSL https://raw.githubusercontent.com/JaimeCruzH/vpsfacil/main/install.sh)
 ```
 
-Or, to install from a local file:
+O desde archivo local:
 
 ```bash
 bash setup.sh
 ```
 
-## What Gets Installed
+## Qué se instala
 
-### Core Components (Required)
-1. **User Setup** — Create secure `jaime` user with SSH key auth
-2. **Docker & Portainer** — Container runtime and management UI
-3. **Nginx Proxy Manager** — Reverse proxy with SSL/TLS certificates
-4. **UFW Firewall** — Security firewall with sensible defaults
-5. **Tailscale** — VPN access to VPS
-6. **Kopia Backup** — Automated backup solution
+### Aplicaciones Core (pasos 1-12)
 
-### Optional Applications
-- **N8N** — Workflow automation platform
-- **OpenClaw** — Custom application
-- **File Browser** — Web-based file manager
+| App | Puerto | Acceso |
+|-----|--------|--------|
+| Portainer CE | 9443 (HTTPS) | Solo VPN Tailscale |
+| Kopia Backup | 51515 (HTTPS) | Solo VPN Tailscale |
+| File Browser | 8080 (HTTP) | Solo VPN Tailscale |
+| Beszel Hub | 8090 (HTTP) | Solo VPN Tailscale |
 
-## Directory Structure
+### Aplicaciones Opcionales
 
-All applications are installed under `/home/jaime/apps/`:
+| App | Puerto | Notas |
+|-----|--------|-------|
+| N8N | 5678 (HTTPS) | + PostgreSQL 16, ejecutar `bash apps/n8n.sh` |
+
+## Arquitectura de Red
+
+Todas las aplicaciones son accesibles **únicamente vía Tailscale VPN**, con HTTPS válido (Let's Encrypt wildcard):
 
 ```
-/home/jaime/apps/
-├── nginx/          # Reverse proxy
-├── portainer/      # Container management
-├── tailscale/      # VPN access
-├── kopia/          # Backup solution
-├── n8n/            # Workflow automation (optional)
-├── openclaw/       # Custom app (optional)
-├── filebrowser/    # File manager (optional)
-└── backups/        # Backup storage
+Navegador (Tailscale activo)
+    → DNS Cloudflare: portainer.vpn.DOMAIN → 100.x.x.x (IP Tailscale)
+    → Túnel WireGuard cifrado
+    → VPS: contenedores escuchan solo en IP Tailscale
 ```
 
-Each application folder contains:
-- `docker-compose.yml` — Service configuration
-- `.env` — Environment variables and secrets
-- `data/` — Persistent storage volume
-- `config/` — Application-specific configuration
+- **Sin exposición a internet** — máxima seguridad
+- **HTTPS válido** — Let's Encrypt wildcard `*.vpn.DOMAIN` vía DNS-01
+- **Sin Nginx Proxy Manager** — menos componentes, menos mantenimiento
 
-## Key Features
+## Estructura de Directorios
 
-### 🎯 Interactive Installation
-- Step-by-step guidance with clear prompts
-- Instructions for both server (VPS) and client (Windows PC)
-- Color-coded messages (Info, Success, Warning, Error)
-- Confirmation before destructive actions
+Todas las apps se instalan bajo `/home/ADMIN_USER/apps/`:
 
-### 🔒 Security First
-- SSH key-based authentication only (no passwords)
-- Firewall enabled by default
-- Rootless operation (everything runs as `jaime` user)
-- Automated backups with encryption
+```
+/home/ADMIN_USER/apps/
+├── certs/          # Certificados SSL wildcard (compartidos)
+├── portainer/      # Portainer CE (gestión Docker)
+├── kopia/          # Kopia Backup (backups automáticos)
+├── filebrowser/    # File Browser web
+├── beszel/         # Beszel Monitoring
+├── n8n/            # N8N Automatización (opcional)
+│   └── postgres/   # Base de datos PostgreSQL
+└── backups/        # Almacén de backups de Kopia
+```
 
-### 📦 Easy Management
-- All apps in one organized location
-- Individual app backup/restore
-- Docker Compose for standardized deployment
-- Portainer UI for visual management
+Cada carpeta de app contiene:
+- `docker-compose.yml` — Configuración del servicio
+- `.env` — Variables y secretos (nunca en git)
+- `data/` — Volumen persistente
 
-### 🔄 Restorable
-- Single app: `tar -czf appname-backup.tar.gz /home/jaime/apps/appname/`
-- All apps: `tar -czf full-apps-backup.tar.gz /home/jaime/apps/`
-- Kopia automates incremental backups
+## Características Principales
 
-## Progress Tracking & Recovery
+### Instalación Interactiva
+- Guía paso a paso con prompts claros
+- Instrucciones para servidor (VPS) y cliente (Windows)
+- Mensajes con código de colores (Info, Éxito, Advertencia, Error)
+- Confirmación antes de acciones destructivas
 
-### Automatic Progress Saving
+### Seguridad
+- Autenticación SSH por llave (sin passwords)
+- UFW con reglas restrictivas + fix Docker/UFW (`iptables: false`)
+- Todo accesible solo por VPN Tailscale
+- Backups automáticos con Kopia
 
-If the installation is interrupted (network issue, timeout, etc.), **your progress is automatically saved**. You don't need to re-enter data or re-run completed steps.
+### Recuperación de Instalación
 
-**How it works:**
-1. All your configuration (domain, username, passwords) is saved to `/tmp/vpsfacil_install.conf` after FASE A
-2. Each completed step is recorded in `/tmp/vpsfacil_core_progress.log`
-3. When you reconnect and re-run `install_core.sh`, it shows:
-   - ✓ Completed steps (with duration)
-   - ⏸ Pending steps
-   - Overall progress percentage
+Si se interrumpe la instalación, el progreso se guarda automáticamente. Al reconectar y re-ejecutar `setup.sh`, el sistema detecta el avance y ofrece continuar desde donde se detuvo.
 
-### Resuming an Interrupted Installation
+## Después de la Instalación
 
-If installation is interrupted in FASE B:
+### Acceso a las Aplicaciones
+
+Todas las URLs siguen el patrón `*.vpn.DOMAIN` (requiere Tailscale activo):
+
+- Portainer: `https://portainer.vpn.DOMAIN:9443`
+- Kopia: `https://kopia.vpn.DOMAIN:51515`
+- File Browser: `http://files.vpn.DOMAIN:8080`
+- Beszel: `http://beszel.vpn.DOMAIN:8090`
+- N8N (opcional): `https://n8n.vpn.DOMAIN:5678`
+
+### Acceso SSH
 
 ```bash
-# Reconnect to your VPS as the admin user
-ssh adminuser@your-vps-ip
-
-# Re-run installation_core script - it will resume from where it stopped
-bash ~/install_core.sh
+ssh -i /ruta/a/llave_privada ADMIN_USER@IP_VPS
 ```
 
-The script will display the current progress and continue with the next pending step. No re-entering of configuration needed.
-
-### Progress Bar Example
-
-```
-╔═══════════════════════════════════════════════════════════════╗
-║  FASE B - Instalación Core: Progreso 3/7 (43%)      ║
-╠═══════════════════════════════════════════════════════════════╣
-║                                                               ║
-║  [████████████░░░░░░░░░░░░░░░░] 43%                   ║
-║                                                               ║
-╠═══════════════════════════════════════════════════════════════╣
-║  ✓ Paso  4: Firewall UFW [completado en 2m15s]   ║
-║  ✓ Paso  6: Docker & Docker Compose [completado en 4m30s] ║
-║  ✓ Paso  7: Certificados SSL (Let's Encrypt) [completado en 1m45s] ║
-║  ⏸ Paso  8: DNS Cloudflare [en espera]          ║
-║  ⏸ Paso  9: Portainer [en espera]                ║
-║  ⏸ Paso 10: Kopia Backup [en espera]             ║
-║  ⏸ Paso 11: File Browser [en espera]             ║
-║                                                               ║
-╚═══════════════════════════════════════════════════════════════╝
-```
-
-## After Installation
-
-### Access Applications
-
-All applications are accessed via subdomains:
-- N8N: `https://n8n.agentexperto.work`
-- File Browser: `https://files.agentexperto.work`
-- OpenClaw: `https://openclaw.agentexperto.work`
-- Portainer: `https://portainer.agentexperto.work` (internal)
-
-### SSH Access
-
-Connect as `jaime` user:
+### Gestión de Aplicaciones
 
 ```bash
-ssh -i /path/to/jaime_key jaime@your-vps-ip
+# Ver logs de una app
+cd /home/ADMIN_USER/apps/appname
+docker compose logs -f
+
+# Reiniciar una app
+docker compose restart
+
+# Detener una app
+docker compose down
+
+# Iniciar una app
+docker compose up -d
 ```
 
-### View Application Logs
+## Solución de Problemas
 
+### Puerto en uso
 ```bash
-cd /home/jaime/apps/appname
-docker-compose logs -f
+sudo netstat -tlnp | grep :PUERTO
 ```
 
-### Stop/Start Applications
-
-```bash
-# Stop specific app
-cd /home/jaime/apps/appname
-docker-compose down
-
-# Restart specific app
-docker-compose up -d
-```
-
-## Troubleshooting
-
-### Port Already in Use
-```bash
-sudo netstat -tlnp | grep :PORT_NUMBER
-```
-
-### Docker Daemon Not Running
+### Docker no responde
 ```bash
 sudo systemctl restart docker
 ```
 
-### Permission Denied
-Make sure you're using the `jaime` user:
+### Certificados SSL expirados
 ```bash
-sudo -u jaime docker ps
+sudo certbot renew
 ```
-
-### Check Application Status
-```bash
-cd /home/jaime/apps/appname
-docker-compose ps
-```
-
-## Support
-
-For detailed technical documentation, see [CLAUDE.md](./CLAUDE.md)
-
-For issues or questions, check the troubleshooting section or contact your system administrator.
 
 ---
 
-**Version:** 1.0.0
-**Last Updated:** 2026-03-18
-**Target OS:** Debian 12
-**Domain:** agentexperto.work
+Para documentación técnica detallada, ver [CLAUDE.md](./CLAUDE.md)
+
+**Target OS:** Debian 12 | **Última actualización:** 2026-05-13

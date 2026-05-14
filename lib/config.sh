@@ -183,6 +183,7 @@ _derive_config_vars() {
     export URL_FILEBROWSER="http://files.vpn.${DOMAIN}:8080"
     export URL_KOPIA="https://kopia.vpn.${DOMAIN}:51515"
     export URL_BESZEL="http://beszel.vpn.${DOMAIN}:8090"
+    export URL_N8N="https://n8n.vpn.${DOMAIN}:5678"
 
     # Configuración de archivos de certificado
     export CERT_FILE="${CERTS_DIR}/origin-cert.pem"
@@ -234,15 +235,15 @@ readonly PORT_PORTAINER="9443"
 readonly PORT_FILEBROWSER="8080"
 readonly PORT_KOPIA="51515"
 readonly PORT_BESZEL="8090"
-readonly PORT_OPENCLAW_WS="18789"
-readonly PORT_OPENCLAW_HTTP="18790"
+readonly PORT_N8N="5678"
 
-# Imágenes Docker core
+# Imágenes Docker
 readonly IMG_PORTAINER="portainer/portainer-ce:latest"
 readonly IMG_FILEBROWSER="filebrowser/filebrowser:latest"
 readonly IMG_KOPIA="kopia/kopia:latest"
 readonly IMG_BESZEL="henrygd/beszel:latest"
-readonly IMG_OPENCLAW_BASE="node:24-bookworm"
+readonly IMG_N8N="docker.n8n.io/n8nio/n8n:latest"
+readonly IMG_POSTGRES="postgres:16-alpine"
 
 # Timeouts (en segundos)
 readonly TIMEOUT_DOCKER_START=60

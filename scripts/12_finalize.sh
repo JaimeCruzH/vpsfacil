@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================
-# scripts/11_finalize.sh — Finalizar: Permisos y Seguridad SSH
+# scripts/12_finalize.sh — Finalizar: Permisos y Seguridad SSH
 # VPSfacil - Sistema Automatizado de Instalación en VPS
 #
 # Qué hace este script:

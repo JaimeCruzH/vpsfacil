@@ -41,7 +41,7 @@ readonly COLOR_BOLD_CYAN="\033[1;36m"
 readonly COLOR_BOLD_WHITE="\033[1;37m"
 
 # --- Prefijos de mensajes ---
-readonly PREFIX_INFO=""
+readonly PREFIX_INFO="${COLOR_BOLD_BLUE}[ℹ]${COLOR_RESET}"
 readonly PREFIX_SUCCESS="${COLOR_BOLD_GREEN}[✓]${COLOR_RESET}"
 readonly PREFIX_WARNING="${COLOR_BOLD_YELLOW}[⚠]${COLOR_RESET}"
 readonly PREFIX_ERROR="${COLOR_BOLD_RED}[✗]${COLOR_RESET}"
